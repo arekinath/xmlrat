@@ -1,0 +1,28 @@
+document <- xmldecl .* `[Decl | _] = Node, Decl`;
+xmldecl <- "<?xml" xmlver encoding? sddecl? s? "?>" `
+  Opts = maps:from_list([X || X = {K, _V} <- Node, is_atom(K)]),
+  #{version := Ver} = Opts,
+  #xml{version = Ver,
+       encoding = maps:get(encoding, Opts, undefined),
+       standalone = maps:get(standalone, Opts, undefined)}
+`;
+xmlver <- s "version" eq ['"] v:vernum ['"] `
+  V = proplists:get_value(v, Node),
+  {version, V}
+`;
+vernum <- "1." [0-9]+ `iolist_to_binary(Node)`;
+sddecl <- s "standalone" eq ['"] v:("yes" / "no") ['"] `
+  V = proplists:get_value(v, Node),
+  {standalone, binary_to_atom(iolist_to_binary(V))}
+`;
+encoding <- s "encoding" eq ['"] v:encname ["'] `
+  V = proplists:get_value(v, Node),
+  {encoding, V}
+`;
+encname <- [A-Za-z] [A-Za-z0-9._-]* `iolist_to_binary(Node)`;
+s <- [\x20\x09\x0d\x0A]+ `iolist_to_binary(Node)`;
+eq <- s? "=" s? ~;
+
+`
+-include("include/records.hrl").
+`

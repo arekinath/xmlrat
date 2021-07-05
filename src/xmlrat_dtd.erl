@@ -1,4 +1,3 @@
-%% xmlrat
 %%
 %% Copyright 2021 The University of Queensland
 %% Author: Alex Wilson <alex@uq.edu.au>
@@ -24,15 +23,42 @@
 %% THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%
 
-%% @private
--module(xmlrat_app).
+%% @doc Types and functions relating to Document Type Declarations (DTDs).
+-module(xmlrat_dtd).
 
--behaviour(application).
+%% @headerfile "../include/records.hrl"
+-include("include/records.hrl").
 
--export([start/2, stop/1]).
+-export_type([
+    doctype/0, info/0, contentspec/0, attrdef/0, attrtype/0,
+    attrdefault/0
+    ]).
 
-start(_StartType, _StartArgs) ->
-    xmlrat_sup:start_link().
+-type doctype() :: #xml_doctype{}.
+-type info() :: #{
+  external_id => xmlrat:extid(),
+  subset => dtd()
+  }.
 
-stop(_State) ->
-    ok.
+-type dtd() :: [decl()].
+-type decl() :: decl_element() | decl_attlist() | decl_entity() |
+  decl_notation() | xmlrat:pi() | xmlrat:comment().
+
+-type decl_element() :: #xmld_element{}.
+-type contentspec() :: empty | any | {mixed, [xmlrat:tag()]} | kidspec().
+-type xarity() :: zero_or_one | zero_or_more | one_or_more | one.
+-type kidspec() ::
+  {xarity(), xmlrat:tag()} |
+  {xarity(), kidspec()} |
+  {choice, [kidspec()]} |
+  {seq, [kidspec()]}.
+
+-type decl_attlist() :: #xmld_attlist{}.
+-type attrdef() :: #xmld_attr{}.
+-type attrtype() :: cdata | {one|many, id|idref|entity|nmtoken} |
+  {enum, [binary()]}.
+-type attrdefault() :: required | implied | binary().
+
+-type decl_entity() :: #xmld_entity{} | #xmld_parameter{}.
+
+-type decl_notation() :: #xmld_notation{}.

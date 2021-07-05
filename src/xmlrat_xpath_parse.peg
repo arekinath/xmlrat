@@ -1,0 +1,193 @@
+expr <- s? orexpr `[_,E] = Node, E`;
+
+orexpr <- orunit / andexpr;
+orunit <- a:andexpr s? "or" s? b:orexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {'or', A, B}
+`;
+
+andexpr <- andunit / eqexpr;
+andunit <- a:eqexpr s? "and" s? b:andexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {'and', A, B}
+`;
+
+eqexpr <- equnit / nequnit / relexpr;
+equnit <- a:relexpr s? "=" s? b:eqexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {eq, A, B}
+`;
+nequnit <- a:relexpr s? "!=" s? b:eqexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {neq, A, B}
+`;
+
+relexpr <- ltunit / gtunit / lteunit / gteunit / addexpr;
+ltunit <- a:addexpr s? "<" s? b:relexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {lt, A, B}
+`;
+gtunit <- a:addexpr s? ">" s? b:relexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {gt, A, B}
+`;
+lteunit <- a:addexpr s? "<=" s? b:relexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {lte, A, B}
+`;
+gteunit <- a:addexpr s? ">=" s? b:relexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {gte, A, B}
+`;
+
+addexpr <- addunit / subunit / multexpr;
+addunit <- a:multexpr s? "+" s? b:addexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {add, A, B}
+`;
+subunit <- a:multexpr s? "-" s? b:addexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {subtract, A, B}
+`;
+
+multexpr <- multunit / divunit / modunit / unaryexpr;
+multunit <- a:unaryexpr s? "*" s? b:multexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {multiply, A, B}
+`;
+divunit <- a:unaryexpr s? "div" s? b:multexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {'div', A, B}
+`;
+modunit <- a:unaryexpr s? "mod" s? b:multexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {'mod', A, B}
+`;
+
+unaryexpr <- negateunit / unionexpr;
+negateunit <- "-" s? unaryexpr `[_,_,A] = Node, {negate, A}`;
+
+unionexpr <- unionunit / pathexpr;
+unionunit <- a:pathexpr s? "|" s? b:unionexpr `
+  A = proplists:get_value(a, Node),
+  B = proplists:get_value(b, Node),
+  {union, A, B}
+`;
+
+pathexpr <- relanyunit / relunit / filterexpr / locpath;
+relunit <- e:filterexpr s? "/" s? p:rellocpath `
+  Expr = proplists:get_value(e, Node),
+  Path = proplists:get_value(p, Node),
+  lists:flatten([Expr]) ++ Path
+`;
+relanyunit <- e:filterexpr s? "//" s? p:rellocpath `
+  Expr = proplists:get_value(e, Node),
+  Path = proplists:get_value(p, Node),
+  lists:flatten([Expr, '_']) ++ Path
+`;
+
+filterexpr <- filterunit / primaryexpr;
+filterunit <- e:primaryexpr s? p:predicate `
+  Expr = proplists:get_value(e, Node),
+  Pred = proplists:get_value(p, Node),
+  [Expr, {self, {name_match, '*'}, Pred}]
+`;
+
+predicate <- "[" s? e:expr s? "]" `
+  Expr = proplists:get_value(e, Node),
+  Expr
+`;
+
+primaryexpr <- varref / bracketexpr / literal / number / funcall;
+bracketexpr <- "(" s? i:orexpr s? ")" `proplists:get_value(i, Node)`;
+
+locpath <- rellocpath / abslocpath `lists:flatten(Node)`;
+abslocpath <- abbrabslocunit / abslocunit;
+abslocunit <- "/" s? rellocpath? `[_, _, P] = Node, [absolute, P]`;
+abbrabslocunit <- "//" s? rellocpath `[_,_,P] = Node, [absolute, '_', P]`;
+rellocpath <- step (pathunit / abbrrellocpath)* `lists:flatten(Node)`;
+abbrrellocpath <- "//" s? step `[_,_,S] = Node, ['_', S]`;
+pathunit <- "/" s? step `[_,_,S] = Node, S`;
+
+step <- fullstep / abbrstep;
+fullstep <- axisspec? s? nodetest (s? predicate)* `
+  [Axis0, _, NodeTest, Preds0] = Node,
+  Axis1 = case Axis0 of
+    A when is_atom(A) -> A;
+    _ -> child
+  end,
+  Preds1 = [X || [_S, X] <- Preds0],
+  {Axis1, NodeTest, lists:flatten(Preds1)}
+`;
+
+abbrstep <- self:"." / parent:".." `
+  case Node of
+    {self, _} -> self;
+    {parent, _} -> parent
+  end
+`;
+axisspec <- fullaxisspec / abbraxisspec;
+fullaxisspec <- axisname s? "::" `[Axis|_] = Node, Axis`;
+abbraxisspec <- s? "@" `attribute`;
+
+funcall <- name:qname s? "(" s? args:funargs? s? ")" `
+  Fun = proplists:get_value(name, Node),
+  Args = proplists:get_value(args, Node),
+  {function_call, Fun, Args}
+`;
+funargs <- head:expr tail:(s? "," s? expr)* `
+  Head = proplists:get_value(head, Node),
+  Tails = proplists:get_value(tail, Node),
+  Tail = [X || [_, _, _, X] <- Tails],
+  [Head | Tail]
+`;
+
+nodetest <- nodebracket / pi / nametest;
+nodebracket <- t:nodetype s? "(" s? ")" `
+  [{t,Type}|_] = Node,
+  {type_match, Type}
+`;
+pi <- "processing-instruction" s? "(" s? arg:literal s? ")" `
+  Arg = proplists:get_value(arg, Node),
+  {pi, Arg}
+`;
+nodetype <- "comment" / "text" / "processing-instruction" / "node" `binary_to_atom(iolist_to_binary(Node))`;
+nametest <- nametestany / nametestns / qname `{name_match, Node}`;
+nametestns <- ncname s? ":" s? "*" `[NS|_] = Node, {NS, '_'}`;
+nametestany <- "*" `'_'`;
+
+varref <- "$" qname `[_,Name] = Node, {var, Name}`;
+
+axisname <- "ancestor" / "ancestor-or-self" / "attribute" / "child" / "descendant" / "descendant-or-self" / "following" / "following-sibling" / "namespace" / "parent" / "preceding" / "preceding-sibling" / "self" `binary_to_atom(iolist_to_binary(Node))`;
+
+ncname <- #[A-Z_a-z][A-Z_a-z\-.0-9]*# `iolist_to_binary(Node)`;
+qname <- ncname (":" ncname)? `
+  case Node of
+    [NS, [_, N]] when is_binary(N) -> {NS, N};
+    [N, _] -> N
+  end
+`;
+
+s <- #[\x20\x09\x0d\x0A]+# ~;
+
+literal <- dqlit / sqlit;
+dqlit <- ["] #[^"]*# ["] `[_,D,_] = Node, iolist_to_binary(D)`;
+sqlit <- ['] #[^']*# ['] `[_,D,_] = Node, iolist_to_binary(D)`;
+
+number <- int / float / zerofloat;
+int <- #[0-9]+# `binary_to_integer(iolist_to_binary(Node))`;
+float <- #[0-9]+# "." #[0-9]*# `binary_to_float(iolist_to_binary(Node))`;
+zerofloat <- #[.][0-9]+# `binary_to_float(iolist_to_binary([$0, Node]))`;

@@ -1,3 +1,9 @@
-src/xmlrat_generic.erl
+src/xmlrat_generic_parse.erl
+src/xmlrat_xpath_parse.erl
+src/xmlrat_xmldecl_parse.erl
 _build
 rebar.lock
+doc/*.html
+doc/*.png
+doc/*.css
+doc/edoc-info

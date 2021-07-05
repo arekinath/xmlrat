@@ -1,0 +1,289 @@
+document <- prolog element misc* `lists:flatten(Node)`;
+
+prolog <- xmldecl? misc* (doctypedecl misc*)? `lists:flatten(Node)`;
+xmldecl <- "<?xml" xmlver encoding? sddecl? s? "?>" `
+  Opts = maps:from_list([X || X = {K, _V} <- Node, is_atom(K)]),
+  #{version := Ver} = Opts,
+  #xml{version = Ver,
+       encoding = maps:get(encoding, Opts, undefined),
+       standalone = maps:get(standalone, Opts, undefined)}
+`;
+xmlver <- s "version" eq ['"] v:vernum ['"] `
+  V = proplists:get_value(v, Node),
+  {version, V}
+`;
+vernum <- "1." [0-9]+ `iolist_to_binary(Node)`;
+sddecl <- s "standalone" eq ['"] v:("yes" / "no") ['"] `
+  V = proplists:get_value(v, Node),
+  {standalone, binary_to_atom(iolist_to_binary(V))}
+`;
+encoding <- s "encoding" eq ['"] v:encname ["'] `
+  V = proplists:get_value(v, Node),
+  {encoding, V}
+`;
+encname <- #[A-Za-z][A-Za-z0-9._-]*# `iolist_to_binary(Node)`;
+
+doctypedecl <- "<!DOCTYPE" s n:name extid:(s externalid)? s? subset:("[" intsubset "]" s?)? ">" `
+  Opts = maps:from_list([X || X = {K, _V} <- Node, is_atom(K)]),
+  #{n := Name} = Opts,
+  Info0 = #{},
+  Info1 = case Opts of
+    #{extid := [_, Id]} -> Info0#{external_id => Id};
+    _ -> Info0
+  end,
+  Info2 = case Opts of
+    #{subset := [_, IntSubset, _, _S]} -> Info1#{subset => lists:flatten(IntSubset)};
+    _ -> Info1
+  end,
+  #xml_doctype{name = Name,
+               info = Info2}
+`;
+intsubset <- (markupdecl / peref / s)*;
+markupdecl <- elementdecl / attlistdecl / entitydecl / notationdecl / pi / comment;
+
+attlistdecl <- "<!ATTLIST" s n:name def:attdef* s? ">" `
+  Name = proplists:get_value(n, Node),
+  Defs = proplists:get_value(def, Node),
+  #xmld_attlist{tag = Name,
+                attributes = Defs}
+`;
+attdef <- s n:name s t:atttype s d:defaultdecl `
+  Name = proplists:get_value(n, Node),
+  Type = proplists:get_value(t, Node),
+  Default = proplists:get_value(d, Node),
+  #xmld_attr{name = Name,
+             type = Type,
+             default = Default}
+`;
+atttype <- stringtype / tokentype / enumtype;
+stringtype <- "CDATA" `cdata`;
+tokentype <- idtype / idrefstype / idreftype / entitytype / entitiestype / nmtokenstype / nmtokentype;
+idtype <- "ID" `{one, id}`;
+idreftype <- "IDREF" `{one, idref}`;
+idrefstype <- "IDREFS" `{many, idref}`;
+entitytype <- "ENTITY" `{one, entity}`;
+entitiestype <- "ENTITIES" `{many, entity}`;
+nmtokentype <- "NMTOKEN" `{one, nmtoken}`;
+nmtokenstype <- "NMTOKENS" `{many, nmtoken}`;
+enumtype <- notationtype / enumeration;
+notationtype <- "NOTATION" s "(" s? head:name tail:(s? "|" s? name)* s? ")" `
+  Head = proplists:get_value(head, Node),
+  Tails = proplists:get_value(tail, Node),
+  Tail = [X || [_, _, _, X] <- Tails],
+  {enum, [Head | Tail]}
+`;
+enumeration <- "(" s? head:nmtoken tail:(s? "|" s? nmtoken)* s? ")" `
+  Head = proplists:get_value(head, Node),
+  Tails = proplists:get_value(tail, Node),
+  Tail = [X || [_, _, _, X] <- Tails],
+  {enum, [Head | Tail]}
+`;
+defaultdecl <- defrequired / defimplied / deffixed;
+defrequired <- "#REQUIRED" `required`;
+defimplied <- "#IMPLIED" `implied`;
+deffixed <- ("#FIXED" s)? v:attvalue `
+  V = proplists:get_value(v, Node),
+  {fixed, V}
+`;
+
+entitydecl <- gedecl / pedecl;
+gedecl <- "<!ENTITY" s n:name s d:entitydef s? ">" `
+  Name = proplists:get_value(n, Node),
+  Def = proplists:get_value(d, Node),
+  #xmld_entity{name = Name,
+               content = Def}
+`;
+pedecl <- "<!ENTITY" s "%" s n:name s d:pedef s? ">" `
+  Name = proplists:get_value(n, Node),
+  Def = proplists:get_value(d, Node),
+  #xmld_parameter{name = Name,
+                  content = Def}
+`;
+pedef <- entityvalue / externalid;
+entitydef <- entityvalue / extentitydef;
+extentitydef <- externalid ndatadecl? `
+  case Node of
+    [ExtID, NDataDecl] -> {ExtID, NDataDecl};
+    [ExtID] -> ExtID
+  end
+`;
+ndatadecl <- s "NDATA" s n:name `
+  Name = proplists:get_value(n, Node),
+  {ndata, Name}
+`;
+entityvalue <- entvaldq / entvalsq;
+entvaldq <- ["] (notdq / reference / peref)* ["] `[_,V,_] = Node, V`;
+entvalsq <- ['] (notsq / reference / peref)* ['] `[_,V,_] = Node, V`;
+
+notationdecl <- "<!NOTATION" s n:name s id:(externalid / publicid) s? ">" `
+  Name = proplists:get_value(n, Node),
+  Id = proplists:get_value(id, Node),
+  #xmld_notation{name = Name, id = Id}
+`;
+publicid <- "PUBLIC" s pubidlit `[_,_,Lit] = Node, {public, Lit}`;
+
+elementdecl <- "<!ELEMENT" s n:name s c:contentspec s? ">" `
+  Name = proplists:get_value(n, Node),
+  Content = proplists:get_value(c, Node),
+  #xmld_element{tag = Name, content = Content}
+`;
+contentspec <- emptycs / anycs / mixed / children;
+emptycs <- "EMPTY" `empty`;
+anycs <- "ANY" `any`;
+mixed <- mixedwn / mixeds `{mixed, Node}`;
+mixedwn <- "(" s? "#PCDATA" ns:(s? "|" s? n:name)* s? ")*" `
+  Ns = proplists:get_value(ns, Node),
+  [proplists:get_value(n, N) || N <- Ns]
+`;
+mixeds <- "(" s? "#PCDATA" s? ")" `[]`;
+children <- inner:(choice / seq) post:[?*+]? `
+  Inner = proplists:get_value(inner, Node),
+  Post = iolist_to_binary(proplists:get_value(post, Node)),
+  Verb = case Post of
+    <<$?>> -> zero_or_one;
+    <<$*>> -> zero_or_more;
+    <<$+>> -> one_or_more;
+    <<>> -> one
+  end,
+  {Verb, Inner}
+`;
+cp <- inner:(name / choice / seq) post:[?*+]? `
+  Inner = proplists:get_value(inner, Node),
+  Post = iolist_to_binary(proplists:get_value(post, Node)),
+  Verb = case Post of
+    <<$?>> -> zero_or_one;
+    <<$*>> -> zero_or_more;
+    <<$+>> -> one_or_more;
+    <<>> -> one
+  end,
+  {Verb, Inner}
+`;
+choice <- "(" s? head:cp tail:(s? "|" s? cp)+ s? ")" `
+  Head = proplists:get_value(head, Node),
+  Tails = proplists:get_value(tail, Node),
+  Tail = [X || [_, _, _, X] <- Tails],
+  {choice, [Head | Tail]}
+`;
+seq <- "(" s? head:cp tail:(s? "," s? cp)* s? ")" `
+  Head = proplists:get_value(head, Node),
+  Tails = proplists:get_value(tail, Node),
+  Tail = [X || [_, _, _, X] <- Tails],
+  {seq, [Head | Tail]}
+`;
+
+
+externalid <- systemextid / pubextid;
+systemextid <- "SYSTEM" s systemlit `[_,_,A] = Node, {system, A}`;
+pubextid <- "PUBLIC" s pubidlit s systemlit `[_, _, Pub, Sys] = Node, {public, Pub, Sys}`;
+
+element <- emptyelemtag / elemtag;
+elemtag <- stag content etag `
+  [STag, Content, ETag] = Node,
+  #xml_element{tag = Name} = STag,
+  case ETag of
+    {end_element, Name} -> ok;
+    {end_element, OtherName} -> error({tag_close_mismatch, [{expected, Name}, {closed, OtherName}]})
+  end,
+  STag#xml_element{content = Content}
+`;
+
+emptyelemtag <- "<" name:name attrs:(s attribute)* tailws:s? "/>" `
+  Name = proplists:get_value(name, Node),
+  Attrs = lists:flatten([proplists:get_value(attrs, Node),
+                         proplists:get_value(tailws, Node)]),
+  #xml_element{tag = Name,
+               attributes = Attrs}
+`;
+
+stag <- "<" name:name attrs:(s attribute)* tailws:s? ">" `
+  Name = proplists:get_value(name, Node),
+  Attrs = lists:flatten([proplists:get_value(attrs, Node),
+                         proplists:get_value(tailws, Node)]),
+  #xml_element{tag = Name,
+               attributes = Attrs}
+`;
+attribute <- name:name eq val:attvalue `
+  Name = proplists:get_value(name, Node),
+  Value = proplists:get_value(val, Node),
+  case Name of
+    {<<"xmlns">>, Ns} ->
+      #xml_namespace{name = Ns, uri = Value};
+    <<"xmlns">> ->
+      #xml_namespace{name = default, uri = Value};
+    _ ->
+      #xml_attribute{name = Name, value = Value}
+  end
+`;
+attvalue <- attvaluedq / attvaluesq;
+attvaluedq <- ["] (notdq / reference)* ["] `[_,V,_] = Node, V`;
+attvaluesq <- ['] (notsq / reference)* ['] `[_,V,_] = Node, V`;
+
+content <- chardata? ((element / reference / cdata / pi / comment) chardata?)* `
+  lists:flatten(Node)
+`;
+
+etag <- "</" n:name s? ">" `{end_element, proplists:get_value(n, Node)}`;
+
+reference <- deccharref / hexcharref / entityref;
+deccharref <- "&#" n:[0-9]+ ";" `
+  NB = proplists:get_value(n, Node),
+  N = binary_to_integer(iolist_to_binary(NB), 10),
+  unicode:characters_to_binary([N], utf8)
+`;
+hexcharref <- "&#x" n:[0-9a-fA-F]+ ";" `
+  NB = proplists:get_value(n, Node),
+  N = binary_to_integer(iolist_to_binary(NB), 16),
+  unicode:characters_to_binary([N], utf8)
+`;
+entityref <- "&" name ";" `[_,Name,_] = Node, {entity, Name}`;
+peref <- "%" name ";" `[_,Name,_] = Node, {parameter, Name}`;
+
+misc <- comment / pi / s;
+comment <- "<!--" (!"-->" .)* "-->" `
+  [_Front, Body, _Back] = Node,
+  #xml_comment{text = iolist_to_binary(Body)}
+`;
+cdata <- "<![CDATA[" (!"]]>" .)* "]]>" `
+  [_Front, Body, _Back] = Node,
+  iolist_to_binary(Body)
+`;
+pi <- tagpi / genericpi;
+tagpi <- "<?" t:name attrs:(s attribute)+ trail:s? "?>" `
+  Target = proplists:get_value(t, Node),
+  Attrs = lists:flatten([proplists:get_value(attrs, Node),
+                         proplists:get_value(trail, Node)]),
+  #xml_pi{target = Target, options = Attrs}
+`;
+genericpi <- "<?" name (s (!"?>" .)*)? "?>" `
+  [_, Target, OptPart, _] = Node,
+  Options = case OptPart of
+    [_S, Rest] -> iolist_to_binary(Rest);
+    _ -> undefined
+  end,
+  #xml_pi{target = Target, options = Options}
+`;
+
+systemlit <- systemlitdq / systemlitsq;
+systemlitdq <- ["] (!["] .)* ["] `[_,A,_] = Node, iolist_to_binary(A)`;
+systemlitsq <- ['] (!['] .)* ['] `[_,A,_] = Node, iolist_to_binary(A)`;
+pubidlit <- pubidlitdq / pubidlitsq;
+pubidlitdq <- ["] [a-zA-Z0-9'()+,./:=?;!*#@$_%\x20\x0d\x0a-]* ["] `[_,A,_] = Node, iolist_to_binary(A)`;
+pubidlitsq <- ['] [a-zA-Z0-9()+,./:=?;!*#@$_%\x20\x0d\x0a-]* ['] `[_,A,_] = Node, iolist_to_binary(A)`;
+
+ncname <- #[A-Z_a-z][A-Z_a-z\-.0-9]*# `iolist_to_binary(Node)`;
+name <- ncname (":" ncname)? `
+  case Node of
+    [NS, [_, N]] when is_binary(N) -> {NS, N};
+    [N, _] -> N
+  end
+`;
+nmtoken <- #[A-Z_a-z\-.0-9]+# `iolist_to_binary(Node)`;
+chardata <- #[^<&]*# `iolist_to_binary(Node)`;
+s <- #[\x20\x09\x0d\x0A]+# `iolist_to_binary(Node)`;
+eq <- s? "=" s? ~;
+notdq <- #[^<%&"]+# `iolist_to_binary(Node)`;
+notsq <- #[^<%&']+# `iolist_to_binary(Node)`;
+
+`
+-include("include/records.hrl").
+`

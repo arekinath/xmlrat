@@ -1,0 +1,34 @@
+@doc xmlrat is an Erlang library for parsing and manipulating XML documents.
+It's particularly designed for use in parsing untrusted inputs in a server
+context (e.g. the original use-case is accepting and processing SAML
+assertions).
+
+It provides:
+<ul>
+  <li>An XML 1.0 DOM parser ({@link xmlrat_parse})</li>
+  <li>A compiler for a subset of XPath 1.0 ({@link xmlrat_xpath})</li>
+  <li>An Erlang <code>parse_transform</code> allowing compiling XPath
+      expressions and XSLT-style templates to pure Erlang code
+      ({@link xmlrat_parse_transform})</li>
+  <li>An implementation of Exclusive Canonical XML ({@link xmlrat_c14n})</li>
+  <li>An implementation of XML Digital Signature 1.0 ({@link xmlrat_dsig})</li>
+</ul>
+
+Being a fully compliant XML library with a complete implementation of all
+specs is a non-goal: features which are inherently dangerous in the context
+of parsing untrusted input from the Internet are generally not included.
+
+The library is written in pure Erlang and is designed to deal primarily with
+binaries for all data.
+
+This differentiates it from the built-in <code>xmerl</code> parser, which
+converts tags and namespace names and other XML components to atoms (allowing
+untrusted input to crash the VM when the atom table is full), and from various
+NIF bindings to <code>libxml</code>.
+
+<a href='https://github.com/willemdj/erlsom'>erlsom</a> is the most similar
+library to xmlrat that the authors are currently aware of: this library
+mostly differs in being a pure DOM parser (since that's necessary for DSIG),
+built-in support for C14N and DSIG, and avoiding the use of XSD schemas for
+serialisation/deserialisation (so that you can deal more easily with inputs
+that don't follow the schema).
