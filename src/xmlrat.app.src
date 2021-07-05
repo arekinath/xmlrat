@@ -1,0 +1,18 @@
+{application, xmlrat,
+ [
+  {description, "Neotoma-based parser for XML 1.0"},
+  {vsn, "0.0.1"},
+  {registered, []},
+  {included_applications, [
+  ]},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  neotoma
+                 ]},
+  {mod, { xmlrat_app, []}},
+  {env, [
+    ]},
+  {licenses, ["BSD-2-Clause"]},
+  {links, [{"GitHub", "https://github.com/arekinath/xmlrat"}]}
+ ]}.
