@@ -111,7 +111,14 @@
     }.
 
 %% @doc Verifies an enveloped XML-DSIG signature.
--spec verify(xmlrat:document(), verify_options()) -> ok | {error, term()}.
+%%
+%% The signature may not cover every part of the subject document, so this
+%% function (and {@link verify/3}) return a <code>VerifiedSubset</code> document
+%% containing just the parts covered by the signature. Parent elements of
+%% covered elements are preserved, but have all their attributes and other
+%% content (other than the signed parts) removed.
+-spec verify(xmlrat:document(), verify_options()) ->
+    {ok, VerifiedSubset :: xmlrat:document()} | {error, term()}.
 verify(Doc, Opts) ->
     case extract_sig(Doc) of
         SigDoc = [_SigElem] ->
@@ -123,7 +130,7 @@ verify(Doc, Opts) ->
 
 %% @doc Verifies a detached XML-DSIG signature.
 -spec verify(xmlrat:document(), xmlrat:document(), verify_options()) ->
-    ok | {error, term()}.
+    {ok, VerifiedSubset :: xmlrat:document()} | {error, term()}.
 verify(SignedDoc, SigDoc, Opts) ->
     % First, parse the signature and its contained information.
     case (catch decode_sig(SigDoc)) of
@@ -169,7 +176,8 @@ verify(SignedDoc, SigDoc, Opts) ->
                                 false ->
                                     {error, invalid_digest};
                                 true ->
-                                    ok
+                                    RefSub = referenced_subset(SignedDoc, Refs),
+                                    {ok, RefSub}
                             end
                     end
             end
@@ -179,6 +187,46 @@ verify(SignedDoc, SigDoc, Opts) ->
 %       at the DTD or XSD. this is kinda hacky, but works fine for pretty much
 %       all reasonable users of dsig (and very few generate a useful DTD).
 -xpath({match_id, "//*[@ID = $id or @Id = $id or @id = $id]"}).
+
+%% Returns the referenced subset of a document
+%% This consists of the elements covered by a reference, plus all of their
+%% children, plus their parents (but parents will have attributes removed if
+%% the element is not covered by any reference)
+-spec referenced_subset(xmlrat:document(), [#reference{}]) -> xmlrat:document().
+referenced_subset([], _Refs) -> [];
+referenced_subset([E0 = #xml_element{} | Rest], Refs) ->
+    MatchesRef = lists:any(fun (Ref) -> matches_ref(E0, Ref) end, Refs),
+    io:format("elem ~p matchesref = ~p\n", [E0, MatchesRef]),
+    case MatchesRef of
+        true ->
+            [E0 | referenced_subset(Rest, Refs)];
+        false ->
+            #xml_element{content = C0} = E0,
+            C1 = referenced_subset(C0, Refs),
+            case C1 of
+                [] ->
+                    referenced_subset(Rest, Refs);
+                _ ->
+                    E1 = E0#xml_element{attributes = [], content = C1},
+                    [E1 | referenced_subset(Rest, Refs)]
+            end
+    end;
+referenced_subset([_ | Rest], Refs) ->
+    referenced_subset(Rest, Refs).
+
+-spec matches_ref(xmlrat:element(), #reference{}) -> boolean().
+matches_ref(E = #xml_element{}, #reference{uri = URI}) ->
+    case URI of
+        undefined ->
+            true;
+        <<>> ->
+            true;
+        <<"#", ID/binary>> ->
+            case match_id([E], #{<<"id">> => ID}) of
+                [E] -> true;
+                _ -> false
+            end
+    end.
 
 %% Verify a reference against (part of, or the entire) signed document given.
 -spec verify_reference(xmlrat:document(), #reference{}) -> boolean().
@@ -758,7 +806,7 @@ verify_valid_sha1_key_test() ->
         "    </KeyInfo>\n"
         "  </Signature>\n"
         "</Envelope>\n"/utf8>>),
-    ?assertMatch(ok, verify(Doc, #{
+    ?assertMatch({ok, _}, verify(Doc, #{
         verifier_options => #{
             danger_trust_any_key => true
             }
@@ -789,7 +837,7 @@ verify_valid_sha256_test() ->
         "    </KeyInfo>\n"
         "  </Signature>\n"
         "</Envelope>\n"/utf8>>),
-    ?assertMatch(ok, verify(Doc, #{
+    ?assertMatch({ok, _}, verify(Doc, #{
         verifier_options => #{
             danger_trust_any_key => true
             }
@@ -827,7 +875,7 @@ verify_valid_sha1_test() ->
             "</ds:Signature>"
             "<x:name>blah</x:name>"
         "</x:foo>">>),
-    ?assertMatch(ok, verify(Doc, #{
+    ?assertMatch({ok, _}, verify(Doc, #{
         verifier_options => #{
             danger_trust_any_cert => true
             }
@@ -888,7 +936,7 @@ verify_valid_complicated_test() ->
         "</KeyInfo>\n"
         "</Signature>\n"
         "</doc>\n">>),
-    ?assertMatch(ok, verify(Doc, #{
+    ?assertMatch({ok, _}, verify(Doc, #{
         verifier_options => #{
             danger_trust_any_key => true
             }
@@ -935,6 +983,7 @@ end_to_end_test() ->
         "    <foo:baz>abc123</foo:baz>\n"
         "  </bar>\n"
         "</doc>">>),
+    [Root] = [E || E = #xml_element{} <- Doc],
     Res = xmlrat_dsig:sign(Doc, #{
         signer_options => #{private_key => Key}}),
     ?assertMatch({ok, _}, Res),
@@ -943,7 +992,7 @@ end_to_end_test() ->
         extract_sig(SigDoc)),
     VRes = verify(SigDoc, #{
         verifier_options => #{danger_trust_any_key => true}}),
-    ?assertMatch(ok, VRes),
+    ?assertMatch({ok, [Root]}, VRes),
     SigDoc2 = lists:map(fun
         (E = #xml_element{attributes = A0}) ->
             A1 = A0 ++ [#xml_attribute{name = <<"test">>,
@@ -954,6 +1003,41 @@ end_to_end_test() ->
     VRes2 = verify(SigDoc2, #{
         verifier_options => #{danger_trust_any_key => true}}),
     ?assertMatch({error, invalid_digest}, VRes2).
+
+partial_end_to_end_test() ->
+    Key = public_key:generate_key({rsa, 2048, 16#10001}),
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version='1.0'?>\n"
+        "<doc xmlns='urn:doc:' xmlns:foo='urn:foo:'>\n"
+        "  <foo>123</foo>\n",
+        "  <bar id='bar'>\n\n"
+        "    <foo:baz>abc123</foo:baz>\n"
+        "  </bar>\n"
+        "</doc>">>),
+    {ok, [Bar]} = xmlrat_xpath:run("/doc/bar", Doc),
+    Res = xmlrat_dsig:sign(Doc, #{
+        signer_options => #{private_key => Key},
+        signed_elements => [<<"bar">>]
+        }),
+    ?assertMatch({ok, _}, Res),
+    {ok, SigDoc} = Res,
+    ?assertMatch([#xml_element{tag = {_, <<"Signature">>, _}}],
+        extract_sig(SigDoc)),
+    VRes = verify(SigDoc, #{
+        verifier_options => #{danger_trust_any_key => true}}),
+    Root = #xml_element{tag = {default, <<"doc">>, <<"urn:doc:doc">>},
+                        content = [Bar]},
+    ?assertMatch({ok, [Root]}, VRes),
+    SigDoc2 = lists:map(fun
+        (E = #xml_element{attributes = A0}) ->
+            A1 = A0 ++ [#xml_attribute{name = <<"test">>,
+                                       value = <<"aaaa">>}],
+            E#xml_element{attributes = A1};
+        (Other) -> Other
+    end, SigDoc),
+    VRes2 = verify(SigDoc2, #{
+        verifier_options => #{danger_trust_any_key => true}}),
+    ?assertMatch({ok, [Root]}, VRes2).
 
 
 -endif.
