@@ -97,12 +97,15 @@
 %% === &lt;mxsl:if&gt; ===
 %%
 %% Conditionally applies or includes some elements if a record field is
-%% set to a value other than <code>undefined</code>.
+%% set to a value other than <code>undefined</code>, or set to boolean
+%% <code>true</code>.
 %%
 %% Attributes:
 %% <ul>
 %%  <li><code>defined</code>: specifies the record field whose value will
 %%      checked for <code>undefined</code></li>
+%%  <li><code>true</code>: specifies the record field whose value will be
+%%      checked for boolean <code>true</code></li>
 %% </ul>
 %% Content:
 %% <ul>
@@ -207,6 +210,23 @@ compile_dyn_attributes([Next | Rest], Subs) ->
                 _ ->
                     AttrMap = attrs_to_map(Attrs),
                     case AttrMap of
+                        #{<<"true">> := Field} ->
+                            case Subs of
+                                #{Field := Expr} ->
+                                    Wrapped = [erl_syntax:case_expr(
+                                        Expr,
+                                        [erl_syntax:clause(
+                                            [erl_syntax:atom(false)], none,
+                                            [erl_syntax:binary([])]),
+                                         erl_syntax:clause(
+                                            [erl_syntax:atom(true)], none,
+                                            [X])
+                                        ]) || X <- IfAttrs],
+                                    E1 = Next#xml_element{content = Content1},
+                                    {Wrapped ++ Attrs0, [E1 | Kids0]};
+                                _ ->
+                                    error({undefined_field, Field})
+                            end;
                         #{<<"defined">> := Field} ->
                             case Subs of
                                 #{Field := Expr} ->
@@ -340,6 +360,21 @@ compile([Next0 | Rest], Subs) ->
                      content = Content0} ->
             AttrMap = attrs_to_map(Attrs),
             case AttrMap of
+                #{<<"true">> := Field} ->
+                    case Subs of
+                        #{Field := Expr} ->
+                            [erl_syntax:case_expr(
+                                Expr,
+                                [erl_syntax:clause(
+                                    [erl_syntax:atom(false)], none,
+                                    [erl_syntax:binary([])]),
+                                 erl_syntax:clause(
+                                    [erl_syntax:atom(true)], none,
+                                    [erl_syntax:list(compile(Content0, Subs))])
+                                ])];
+                        _ ->
+                            error({undefined_field, Field})
+                    end;
                 #{<<"defined">> := Field} ->
                     case Subs of
                         #{Field := Expr} ->

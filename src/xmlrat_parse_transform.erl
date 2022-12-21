@@ -419,6 +419,13 @@ wrap_convert(Tree0, {type, _, atom, []}, _D) ->
     erl_syntax:application(
         erl_syntax:atom(binary_to_existing_atom),
         [to_scalar(Tree0)]);
+wrap_convert(Tree0, {type, _, boolean, []}, _D) ->
+    erl_syntax:case_expr(to_scalar(Tree0), [
+        erl_syntax:clause([erl_syntax:binary([])], none, [erl_syntax:atom(false)]),
+        erl_syntax:clause([erl_syntax:atom(undefined)], none, [erl_syntax:atom(false)]),
+        erl_syntax:clause([erl_syntax:list([])], none, [erl_syntax:atom(false)]),
+        erl_syntax:clause([erl_syntax:underscore()], none, [erl_syntax:atom(true)])
+        ]);
 wrap_convert(Tree0, {type, _, record, [{atom, _, Rec}]}, D) ->
     case D of
         #{Rec := DecoderFunc} -> ok;
@@ -528,6 +535,8 @@ wrap_econvert(Tree0, {type, _, atom, []}, _D) ->
     erl_syntax:application(
         erl_syntax:atom(atom_to_binary),
         [Tree0]);
+wrap_econvert(Tree0, {type, _, boolean, []}, _D) ->
+    Tree0;
 wrap_econvert(Tree0, {type, _, record, [{atom, _, Rec}]}, E) ->
     case E of
         #{Rec := EncoderFunc} -> ok;

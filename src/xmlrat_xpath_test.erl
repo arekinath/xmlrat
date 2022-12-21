@@ -41,6 +41,7 @@
 
 -record(nstestitem, {
     id :: integer(),
+    testing = false :: boolean(),
     number :: undefined | integer(),
     values :: [binary()]
     }).
@@ -49,7 +50,8 @@
 -record(foobar, {
     a :: integer(),
     b :: undefined | uid(),
-    c = foo :: thing()
+    c = foo :: thing(),
+    d :: boolean()
     }).
 -record(nstest, {
     name :: binary(),
@@ -71,6 +73,7 @@
 
 -xpath_record({match_nstest_item, nstestitem, #{
     id => "/test:item/@id",
+    testing => "/test:item/@testing",
     number => "/test:item/@number",
     values => "/test:item/test:value"
     }, ?namespaces}).
@@ -83,6 +86,9 @@
 -xml_record({gen_nstest_item, nstestitem,
     "<test:item xmlns:test='urn:test:'>"
         "<mxsl:attribute name='id'><mxsl:value-of field='id'/></mxsl:attribute>"
+        "<mxsl:if true='testing'>"
+            "<mxsl:attribute name='testing'>yes</mxsl:attribute>"
+        "</mxsl:if>"
         "<mxsl:if defined='number'>"
             "<mxsl:attribute name='number'>&number;</mxsl:attribute>"
         "</mxsl:if>"
@@ -137,14 +143,14 @@ record_ns_test() ->
         "<foo:value>abcd</foo:value>"
         "<foo:value>hijk</foo:value>"
         "</foo:item>"
-        "<foo:item id='501'>"
+        "<foo:item id='501' testing='what'>"
         "<foo:value>aaaa</foo:value>"
         "</foo:item>"
         "</nstest>"),
     Rec = match_nstest(Doc),
     ?assertMatch(#nstest{name = <<"foo">>, items = _}, Rec),
-    ?assertMatch([#nstestitem{id = 500, values = [<<"abcd">>, <<"hijk">>]},
-                  #nstestitem{id = 501, values = [<<"aaaa">>]}],
+    ?assertMatch([#nstestitem{id = 500, testing = false, values = [<<"abcd">>, <<"hijk">>]},
+                  #nstestitem{id = 501, testing = true, values = [<<"aaaa">>]}],
                   Rec#nstest.items).
 
 record_enum_test() ->
@@ -163,7 +169,7 @@ gen_item_test() ->
 
 gen_test() ->
     Item1 = #nstestitem{id = 501, values = [<<"foo">>, <<"bar">>]},
-    Item2 = #nstestitem{id = 510, values = [<<"baz">>]},
+    Item2 = #nstestitem{id = 510, testing = true, values = [<<"baz">>]},
     Doc = gen_nstest(#nstest{name = <<"what">>, items = [Item1, Item2]}),
     io:format("~s\n", [xmlrat_generate:string(Doc, #{indent => true})]),
     Rec = match_nstest(Doc),
