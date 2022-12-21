@@ -33,7 +33,7 @@
     match_test/1, match_foobar/1, match_nstest_item/1,
     match_nstest/1, gen_nstest_item/1, gen_nstest/1]).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -type uid() :: binary().
 

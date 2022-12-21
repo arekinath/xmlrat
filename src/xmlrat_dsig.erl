@@ -47,8 +47,8 @@
 %% validating public keys and certificates.
 -module(xmlrat_dsig).
 
--include("include/records.hrl").
--include("include/dsig.hrl").
+-include_lib("xmlrat/include/records.hrl").
+-include_lib("xmlrat/include/dsig.hrl").
 -include_lib("public_key/include/public_key.hrl").
 
 -compile({parse_transform, xmlrat_parse_transform}).

@@ -33,7 +33,7 @@
 %% a rudimentary pretty-printer / indentation normaliser.
 -module(xmlrat_generate).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([string/1, string/2]).
 

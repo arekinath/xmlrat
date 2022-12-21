@@ -285,5 +285,5 @@ notdq <- #[^<%&"]+# `iolist_to_binary(Node)`;
 notsq <- #[^<%&']+# `iolist_to_binary(Node)`;
 
 `
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 `

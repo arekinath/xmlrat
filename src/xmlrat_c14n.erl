@@ -36,7 +36,7 @@
 
 -compile({parse_transform, xmlrat_parse_transform}).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([string/1, string/2]).
 

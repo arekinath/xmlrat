@@ -53,7 +53,7 @@
 %% encoded).
 -module(xmlrat_parse).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([
     string/1, string/2, file/1, file/2,

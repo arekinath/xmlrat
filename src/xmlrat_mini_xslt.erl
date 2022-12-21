@@ -144,7 +144,7 @@
 %%
 -module(xmlrat_mini_xslt).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([to_expr/2]).
 

@@ -27,7 +27,7 @@
 %% @private
 -module(xmlrat_xpath_compile).
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([
     compile_fun/1, compile_fun/2, compile_module/2, compile_module/1,

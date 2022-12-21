@@ -24,5 +24,5 @@ s <- [\x20\x09\x0d\x0A]+ `iolist_to_binary(Node)`;
 eq <- s? "=" s? ~;
 
 `
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 `

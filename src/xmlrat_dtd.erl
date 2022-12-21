@@ -27,7 +27,7 @@
 -module(xmlrat_dtd).
 
 %% @headerfile "../include/records.hrl"
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export_type([
     doctype/0, info/0, contentspec/0, attrdef/0, attrtype/0,

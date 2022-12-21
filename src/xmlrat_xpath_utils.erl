@@ -29,7 +29,7 @@
 
 %% Runtime utility functions for compiled xpath matching functions.
 
--include("include/records.hrl").
+-include_lib("xmlrat/include/records.hrl").
 
 -export([
     filter_with_index/4,
