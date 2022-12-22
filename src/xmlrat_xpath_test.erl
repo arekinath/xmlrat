@@ -50,8 +50,7 @@
 -record(foobar, {
     a :: integer(),
     b :: undefined | uid(),
-    c = foo :: thing(),
-    d :: boolean()
+    c = foo :: thing()
     }).
 -record(nstest, {
     name :: binary(),
@@ -139,18 +138,20 @@ record_missing_error_test() ->
 
 record_ns_test() ->
     {ok, Doc} = xmlrat_parse:string("<nstest name='foo' xmlns='urn:root:' xmlns:foo='urn:test:'>"
-        "<foo:item id='500'>"
+        "<foo:item id='500' testing='false'>"
         "<foo:value>abcd</foo:value>"
         "<foo:value>hijk</foo:value>"
         "</foo:item>"
-        "<foo:item id='501' testing='what'>"
+        "<foo:item id='501' testing='true'>"
         "<foo:value>aaaa</foo:value>"
         "</foo:item>"
+        "<foo:item id='502'><foo:value></foo:value></foo:item>"
         "</nstest>"),
     Rec = match_nstest(Doc),
     ?assertMatch(#nstest{name = <<"foo">>, items = _}, Rec),
     ?assertMatch([#nstestitem{id = 500, testing = false, values = [<<"abcd">>, <<"hijk">>]},
-                  #nstestitem{id = 501, testing = true, values = [<<"aaaa">>]}],
+                  #nstestitem{id = 501, testing = true, values = [<<"aaaa">>]},
+                  #nstestitem{id = 502, testing = false, values = [<<>>]}],
                   Rec#nstest.items).
 
 record_enum_test() ->

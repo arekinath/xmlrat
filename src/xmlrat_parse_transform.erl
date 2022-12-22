@@ -424,6 +424,7 @@ wrap_convert(Tree0, {type, _, boolean, []}, _D) ->
         erl_syntax:clause([erl_syntax:binary([])], none, [erl_syntax:atom(false)]),
         erl_syntax:clause([erl_syntax:atom(undefined)], none, [erl_syntax:atom(false)]),
         erl_syntax:clause([erl_syntax:list([])], none, [erl_syntax:atom(false)]),
+        erl_syntax:clause([erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string("false"))])], none, [erl_syntax:atom(false)]),
         erl_syntax:clause([erl_syntax:underscore()], none, [erl_syntax:atom(true)])
         ]);
 wrap_convert(Tree0, {type, _, record, [{atom, _, Rec}]}, D) ->
