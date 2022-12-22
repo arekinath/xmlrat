@@ -843,6 +843,71 @@ verify_valid_sha256_test() ->
             }
         })).
 
+verify_valid_sha256_ssh_fp_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<Envelope xmlns=\"http://example.org/envelope\">\n"
+        "  <Body>\n"
+        "    Olá mundo\n"
+        "  </Body>\n"
+        "  <Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n"
+        "    <SignedInfo>\n"
+        "      <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n"
+        "      <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\n"
+        "      <Reference URI=\"\">\n"
+        "        <Transforms>\n"
+        "          <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\n"
+        "        </Transforms>\n"
+        "        <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\n"
+        "        <DigestValue>XmEzFTF6w33nhHfeQqIZKwITz3H2mbBvShxWn+ML/7s=</DigestValue>\n"
+        "      </Reference>\n"
+        "    </SignedInfo>\n"
+        "    <SignatureValue>C/NE8YqqNcySFxRazwbxZSUsoAoeqgbEDiVn+yg1zZY1Evb7VMV1MdoDJM39f7L26e9H//br6sjHZn7s+LGCJp9F2ZmCgiJxSOxqy2yCt6perxoKF3MDQmDRnMtglKeWNSBfYZRWEcA64PMMHz5WS5DCIVTcgU7lFzgMpUfYLOs=</SignatureValue>\n"
+        "    <KeyInfo>\n"
+        "      <KeyValue><RSAKeyValue><Modulus>4IlzOY3Y9fXoh3Y5f06wBbtTg94Pt6vcfcd1KQ0FLm0S36aGJtTSb6pYKfyX7PqCUQ8wgL6xUJ5GRPEsu9gyz8ZobwfZsGCsvu40CWoT9fcFBZPfXro1Vtlh/xl/yYHm+Gzqh0Bw76xtLHSfLfpVOrmZdwKmSFKMTvNXOFd0V18=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue>\n"
+        "    </KeyInfo>\n"
+        "  </Signature>\n"
+        "</Envelope>\n"/utf8>>),
+    ?assertMatch({ok, _}, verify(Doc, #{
+        verifier_options => #{
+            fingerprints => [
+                {ssh, sha256, base64:decode(<<"bRnkjhD610D4zSpRu/jV3Wfi4tYZ0r2eO82GbDBwW5Y=">>)}]
+            }
+        })).
+
+
+verify_valid_sha256_spki_fp_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<Envelope xmlns=\"http://example.org/envelope\">\n"
+        "  <Body>\n"
+        "    Olá mundo\n"
+        "  </Body>\n"
+        "  <Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n"
+        "    <SignedInfo>\n"
+        "      <CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\" />\n"
+        "      <SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\" />\n"
+        "      <Reference URI=\"\">\n"
+        "        <Transforms>\n"
+        "          <Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\" />\n"
+        "        </Transforms>\n"
+        "        <DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\" />\n"
+        "        <DigestValue>XmEzFTF6w33nhHfeQqIZKwITz3H2mbBvShxWn+ML/7s=</DigestValue>\n"
+        "      </Reference>\n"
+        "    </SignedInfo>\n"
+        "    <SignatureValue>C/NE8YqqNcySFxRazwbxZSUsoAoeqgbEDiVn+yg1zZY1Evb7VMV1MdoDJM39f7L26e9H//br6sjHZn7s+LGCJp9F2ZmCgiJxSOxqy2yCt6perxoKF3MDQmDRnMtglKeWNSBfYZRWEcA64PMMHz5WS5DCIVTcgU7lFzgMpUfYLOs=</SignatureValue>\n"
+        "    <KeyInfo>\n"
+        "      <KeyValue><RSAKeyValue><Modulus>4IlzOY3Y9fXoh3Y5f06wBbtTg94Pt6vcfcd1KQ0FLm0S36aGJtTSb6pYKfyX7PqCUQ8wgL6xUJ5GRPEsu9gyz8ZobwfZsGCsvu40CWoT9fcFBZPfXro1Vtlh/xl/yYHm+Gzqh0Bw76xtLHSfLfpVOrmZdwKmSFKMTvNXOFd0V18=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue>\n"
+        "    </KeyInfo>\n"
+        "  </Signature>\n"
+        "</Envelope>\n"/utf8>>),
+    ?assertMatch({ok, _}, verify(Doc, #{
+        verifier_options => #{
+            fingerprints => [
+                {spki, sha256, binary:decode_hex(<<"1cfc3d1a7b49c9ebd22cd091ec060397b53a489845ed5bdb976ee638b50ca1b3">>)}]
+            }
+        })).
+
 verify_valid_sha1_test() ->
     {ok, Doc} = xmlrat_parse:string(<<
         "<?xml version=\"1.0\"?>"
@@ -878,6 +943,160 @@ verify_valid_sha1_test() ->
     ?assertMatch({ok, _}, verify(Doc, #{
         verifier_options => #{
             danger_trust_any_cert => true
+            }
+        })).
+
+verify_valid_sha1_spki_fp_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\"?>"
+        "<x:foo ID=\"9616e6c0-f525-11b7-afb7-5cf9dd711ed3\" "
+               "xmlns:x=\"urn:foo:x:\">"
+            "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+                "<ds:SignedInfo>"
+                    "<ds:CanonicalizationMethod "
+                        "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                    "<ds:SignatureMethod "
+                        "Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>"
+                    "<ds:Reference URI=\"#9616e6c0-f525-11b7-afb7-5cf9dd711ed3\">"
+                        "<ds:Transforms>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                        "</ds:Transforms>"
+                        "<ds:DigestMethod "
+                            "Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/>"
+                        "<ds:DigestValue>xPVYXCs5uMMmIbfTiTZ5R5DVhTU=</ds:DigestValue>"
+                    "</ds:Reference>"
+                "</ds:SignedInfo>"
+                "<ds:SignatureValue>rYk+WAghakHfR9VtpLz3AkMD1xLD1wISfNgch9+i+PC72RqhmfeMCZMkBaw0EO+CTKEoFBQIQaJYlEj8rIG+XN+8HyBV75BrMKZs1rdN+459Rpn2FOOJuHVb2jLDPecC9Ok/DGaNu6lol60hG9di66EZkL8ErQCuCeZqiw9tiXMUPQyVa2GxqT2UeXvJ5YtkNMDweUc3HhEnTG3ovYt1vOZt679w4N0HAwUa9rk40Z12fOTx77BbMICZ9Q4N2m3UbaFU24YHYpHR+WUTiwzXcmdkrHiE5IF37h7rTKAEixD2bTojaefmrobAz0+mBhCqBPcbfNLhLrpT43xhMenjpA==</ds:SignatureValue>"
+                "<ds:KeyInfo>"
+                    "<ds:X509Data>"
+                        "<ds:X509Certificate>MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ</ds:X509Certificate>"
+                    "</ds:X509Data>"
+                "</ds:KeyInfo>"
+            "</ds:Signature>"
+            "<x:name>blah</x:name>"
+        "</x:foo>">>),
+    ?assertMatch({ok, _}, verify(Doc, #{
+        verifier_options => #{
+            fingerprints => [{spki, sha512, base64:decode(<<"zl1Hj2NNr68sGkFHsTPNCPc/P6afxuvZl7NXqECqwLrXgzX7fDuvUhVCLqtzq4NQ3w95QdARO+wwKDOywleWiQ==">>)}]
+            }
+        })).
+
+verify_valid_sha1_x509_fp_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\"?>"
+        "<x:foo ID=\"9616e6c0-f525-11b7-afb7-5cf9dd711ed3\" "
+               "xmlns:x=\"urn:foo:x:\">"
+            "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+                "<ds:SignedInfo>"
+                    "<ds:CanonicalizationMethod "
+                        "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                    "<ds:SignatureMethod "
+                        "Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>"
+                    "<ds:Reference URI=\"#9616e6c0-f525-11b7-afb7-5cf9dd711ed3\">"
+                        "<ds:Transforms>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                        "</ds:Transforms>"
+                        "<ds:DigestMethod "
+                            "Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/>"
+                        "<ds:DigestValue>xPVYXCs5uMMmIbfTiTZ5R5DVhTU=</ds:DigestValue>"
+                    "</ds:Reference>"
+                "</ds:SignedInfo>"
+                "<ds:SignatureValue>rYk+WAghakHfR9VtpLz3AkMD1xLD1wISfNgch9+i+PC72RqhmfeMCZMkBaw0EO+CTKEoFBQIQaJYlEj8rIG+XN+8HyBV75BrMKZs1rdN+459Rpn2FOOJuHVb2jLDPecC9Ok/DGaNu6lol60hG9di66EZkL8ErQCuCeZqiw9tiXMUPQyVa2GxqT2UeXvJ5YtkNMDweUc3HhEnTG3ovYt1vOZt679w4N0HAwUa9rk40Z12fOTx77BbMICZ9Q4N2m3UbaFU24YHYpHR+WUTiwzXcmdkrHiE5IF37h7rTKAEixD2bTojaefmrobAz0+mBhCqBPcbfNLhLrpT43xhMenjpA==</ds:SignatureValue>"
+                "<ds:KeyInfo>"
+                    "<ds:X509Data>"
+                        "<ds:X509Certificate>MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ</ds:X509Certificate>"
+                    "</ds:X509Data>"
+                "</ds:KeyInfo>"
+            "</ds:Signature>"
+            "<x:name>blah</x:name>"
+        "</x:foo>">>),
+    ?assertMatch({ok, _}, verify(Doc, #{
+        verifier_options => #{
+            fingerprints => [{x509, sha, base64:decode(<<"xlYKtnfxFAPGWCMqkUz7cTQV9pw=">>)}]
+            }
+        })).
+
+verify_valid_sha1_x509_ca_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\"?>"
+        "<x:foo ID=\"9616e6c0-f525-11b7-afb7-5cf9dd711ed3\" "
+               "xmlns:x=\"urn:foo:x:\">"
+            "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+                "<ds:SignedInfo>"
+                    "<ds:CanonicalizationMethod "
+                        "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                    "<ds:SignatureMethod "
+                        "Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>"
+                    "<ds:Reference URI=\"#9616e6c0-f525-11b7-afb7-5cf9dd711ed3\">"
+                        "<ds:Transforms>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                        "</ds:Transforms>"
+                        "<ds:DigestMethod "
+                            "Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/>"
+                        "<ds:DigestValue>xPVYXCs5uMMmIbfTiTZ5R5DVhTU=</ds:DigestValue>"
+                    "</ds:Reference>"
+                "</ds:SignedInfo>"
+                "<ds:SignatureValue>rYk+WAghakHfR9VtpLz3AkMD1xLD1wISfNgch9+i+PC72RqhmfeMCZMkBaw0EO+CTKEoFBQIQaJYlEj8rIG+XN+8HyBV75BrMKZs1rdN+459Rpn2FOOJuHVb2jLDPecC9Ok/DGaNu6lol60hG9di66EZkL8ErQCuCeZqiw9tiXMUPQyVa2GxqT2UeXvJ5YtkNMDweUc3HhEnTG3ovYt1vOZt679w4N0HAwUa9rk40Z12fOTx77BbMICZ9Q4N2m3UbaFU24YHYpHR+WUTiwzXcmdkrHiE5IF37h7rTKAEixD2bTojaefmrobAz0+mBhCqBPcbfNLhLrpT43xhMenjpA==</ds:SignatureValue>"
+                "<ds:KeyInfo>"
+                    "<ds:X509Data>"
+                        "<ds:X509Certificate>MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ</ds:X509Certificate>"
+                    "</ds:X509Data>"
+                "</ds:KeyInfo>"
+            "</ds:Signature>"
+            "<x:name>blah</x:name>"
+        "</x:foo>">>),
+    Der = base64:decode(<<"MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ">>),
+    Cert = public_key:pkix_decode_cert(Der, otp),
+    ?assertMatch({ok, _}, verify(Doc, #{
+        verifier_options => #{
+            ca_certs => [Cert]
+            }
+        })).
+
+verify_valid_sha1_no_fp_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<?xml version=\"1.0\"?>"
+        "<x:foo ID=\"9616e6c0-f525-11b7-afb7-5cf9dd711ed3\" "
+               "xmlns:x=\"urn:foo:x:\">"
+            "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+                "<ds:SignedInfo>"
+                    "<ds:CanonicalizationMethod "
+                        "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                    "<ds:SignatureMethod "
+                        "Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>"
+                    "<ds:Reference URI=\"#9616e6c0-f525-11b7-afb7-5cf9dd711ed3\">"
+                        "<ds:Transforms>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>"
+                            "<ds:Transform "
+                                "Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>"
+                        "</ds:Transforms>"
+                        "<ds:DigestMethod "
+                            "Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/>"
+                        "<ds:DigestValue>xPVYXCs5uMMmIbfTiTZ5R5DVhTU=</ds:DigestValue>"
+                    "</ds:Reference>"
+                "</ds:SignedInfo>"
+                "<ds:SignatureValue>rYk+WAghakHfR9VtpLz3AkMD1xLD1wISfNgch9+i+PC72RqhmfeMCZMkBaw0EO+CTKEoFBQIQaJYlEj8rIG+XN+8HyBV75BrMKZs1rdN+459Rpn2FOOJuHVb2jLDPecC9Ok/DGaNu6lol60hG9di66EZkL8ErQCuCeZqiw9tiXMUPQyVa2GxqT2UeXvJ5YtkNMDweUc3HhEnTG3ovYt1vOZt679w4N0HAwUa9rk40Z12fOTx77BbMICZ9Q4N2m3UbaFU24YHYpHR+WUTiwzXcmdkrHiE5IF37h7rTKAEixD2bTojaefmrobAz0+mBhCqBPcbfNLhLrpT43xhMenjpA==</ds:SignatureValue>"
+                "<ds:KeyInfo>"
+                    "<ds:X509Data>"
+                        "<ds:X509Certificate>MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ</ds:X509Certificate>"
+                    "</ds:X509Data>"
+                "</ds:KeyInfo>"
+            "</ds:Signature>"
+            "<x:name>blah</x:name>"
+        "</x:foo>">>),
+    ?assertMatch({error, _}, verify(Doc, #{
+        verifier_options => #{
+            fingerprints => [{spki, sha256, <<>>}]
             }
         })).
 
