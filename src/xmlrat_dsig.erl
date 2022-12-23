@@ -53,7 +53,10 @@
 
 -compile({parse_transform, xmlrat_parse_transform}).
 
--export([verify/2, verify/3, sign/2]).
+-export([
+    verify/2, verify/3, sign/2,
+    parse_key/1, generate_key/1
+    ]).
 
 % These are exported to silence the "unused function" warnings.
 -export([
@@ -61,8 +64,25 @@
     encode_keyvalue_ec/1, encode_keyinfo/1
     ]).
 
+-export_type([
+    pubkey_algo/0, hash_algo/0, pubkey/0,
+    cert/0, key_details/0
+    ]).
+
 -type base64() :: binary().
 -type uri() :: binary().
+
+-type pubkey_algo() :: rsa | dsa | ecdsa | hmac.
+-type hash_algo() :: sha | sha256 | sha384 | sha512.
+-type pubkey() :: #'RSAPublicKey'{} |
+    {integer(), #'Dss-Parms'{}} |
+    {#'ECPoint'{}, {namedCurve, tuple() | atom()}}.
+-type cert() :: #'OTPCertificate'{}.
+-type key_details() :: #{
+    public_key => pubkey(),
+    certificate => cert(),
+    name => binary()
+    }.
 
 -record(transform, {
     algo :: uri(),
@@ -109,6 +129,59 @@
     verifier_options => map(),
     verifier => module()
     }.
+
+%% @doc Parse a ds:KeyInfo element.
+%%
+%% Converts a <code>ds:KeyInfo</code> element into the more friendly
+%% {@link key_details()} map, containing decoded certificates and public
+%% keys.
+-spec parse_key(xmlrat:document()) -> {ok, key_details()} | {error, term()}.
+parse_key(Doc) ->
+    case (catch decode_keyinfo(Doc)) of
+        {'EXIT', Why} ->
+            {error, Why};
+        #keyinfo{name = undefined, certs = undefined, key = undefined} ->
+            {error, insufficient_key_info};
+        #keyinfo{name = N, certs = undefined, key = undefined} when is_binary(N) ->
+            {ok, #{name => N}};
+        #keyinfo{certs = [CertB64 | _]} ->
+            CertBin = base64:decode(CertB64),
+            Cert = #'OTPCertificate'{} =
+                public_key:pkix_decode_cert(CertBin, otp),
+            PubKey = cert_to_pubkey(Cert),
+            {ok, #{certificate => Cert, public_key => PubKey}};
+        #keyinfo{name = N, key = KeyValue} ->
+            Details0 = case N of
+                undefined -> #{};
+                _ -> #{name => N}
+            end,
+            PubKey = keyvalue_to_pubkey(KeyValue),
+            {ok, Details0#{public_key => PubKey}}
+    end.
+
+%% @doc Generate a ds:KeyInfo element.
+%%
+%% Inverse of {@link parse_key/1}. Converts a {@link key_details()} map into
+%% a <code>ds:KeyInfo</code> element.
+-spec generate_key(key_details()) -> {ok, xmlrat:document()} | {error, term()}.
+generate_key(#{certificate := Cert}) ->
+    Der = public_key:pkix_encode('OTPCertificate', Cert, otp),
+    B64 = base64:encode(Der),
+    case (catch encode_keyinfo(#keyinfo{certs = [B64]})) of
+        {'EXIT', Why} -> {error, Why};
+        Enc -> {ok, Enc}
+    end;
+generate_key(KD = #{public_key := PubKey}) ->
+    KV = pubkey_to_keyvalue(PubKey),
+    KI0 = #keyinfo{key = KV},
+    KI1 = case KD of
+        #{name := Name} -> KI0#keyinfo{name = Name};
+        _ -> KI0
+    end,
+    case (catch encode_keyinfo(KI1)) of
+        {'EXIT', Why} -> {error, Why};
+        Enc -> {ok, Enc}
+    end.
 
 %% @doc Verifies an enveloped XML-DSIG signature.
 %%
@@ -291,9 +364,6 @@ run_xform(_Doc, #transform{algo = URI}) ->
     error({unsupported_transform, URI}).
 
 -type keyvalue() :: #keyvalue_rsa{} | #keyvalue_ec{}.
--type pubkey() :: #'RSAPublicKey'{} |
-    {integer(), #'Dss-Parms'{}} |
-    {#'ECPoint'{}, {namedCurve, tuple() | atom()}}.
 
 -spec keyvalue_to_pubkey(keyvalue()) -> pubkey().
 keyvalue_to_pubkey(#keyvalue_rsa{modulus = ModB64, exponent = ExpB64}) ->
@@ -643,8 +713,8 @@ generate_references(Doc, [URI | Rest], Opts) ->
      | generate_references(Doc, Rest, Opts)].
 
 -define(namespaces, #{
-    <<"ds">> => <<"http://www.w3.org/2000/09/xmldsig#">>,
-    <<"ec">> => <<"http://www.w3.org/2001/10/xml-exc-c14n#">>
+    <<"ds">> => ?NS_dsig,
+    <<"ec">> => ?dsig_XML_c14n_exc
     }).
 
 -xpath_record({decode_xform, transform, #{
@@ -682,7 +752,7 @@ generate_references(Doc, [URI | Rest], Opts) ->
     exponent => "/ds:RSAKeyValue/ds:Exponent"
     }, ?namespaces}).
 -xml_record({encode_keyvalue_rsa, keyvalue_rsa,
-    "<RSAKeyValue>"
+    "<RSAKeyValue xmlns='http://www.w3.org/2000/09/xmldsig#'>"
         "<Modulus>&modulus;</Modulus>"
         "<Exponent>&exponent;</Exponent>"
     "</RSAKeyValue>", ?namespaces}).
@@ -693,7 +763,7 @@ generate_references(Doc, [URI | Rest], Opts) ->
     pubkey => "/ds:ECKeyValue/ds:PublicKey"
     }, ?namespaces}).
 -xml_record({encode_keyvalue_ec, keyvalue_ec,
-    "<ECKeyValue>"
+    "<ECKeyValue xmlns='http://www.w3.org/2000/09/xmldsig#'>"
         "<NamedCurve URI='&curve;'/>"
         "<PublicKey>&pubkey;</PublicKey>"
     "</ECKeyValue>", ?namespaces}).
@@ -705,7 +775,7 @@ generate_references(Doc, [URI | Rest], Opts) ->
     }, ?namespaces}).
 
 -xml_record({encode_keyinfo, keyinfo,
-    "<KeyInfo>"
+    "<KeyInfo xmlns='http://www.w3.org/2000/09/xmldsig#'>"
         "<mxsl:if defined='name'>"
             "<KeyName>&name;</KeyName>"
         "</mxsl:if>"
@@ -1099,6 +1169,54 @@ verify_valid_sha1_no_fp_test() ->
             fingerprints => [{spki, sha256, <<>>}]
             }
         })).
+
+parse_key_rsa_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<KeyInfo xmlns='http://www.w3.org/2000/09/xmldsig#'>\n"
+        "<KeyValue><RSAKeyValue>\n"
+        "<Modulus>\n"
+        "4IlzOY3Y9fXoh3Y5f06wBbtTg94Pt6vcfcd1KQ0FLm0S36aGJtTSb6pYKfyX7PqCUQ8wgL6xUJ5GRPEsu9gyz8\n"
+        "ZobwfZsGCsvu40CWoT9fcFBZPfXro1Vtlh/xl/yYHm+Gzqh0Bw76xtLHSfLfpVOrmZdwKmSFKMTvNXOFd0V18=\n"
+        "</Modulus>\n"
+        "<Exponent>AQAB</Exponent>\n"
+        "</RSAKeyValue></KeyValue>\n"
+        "</KeyInfo>\n">>),
+    R = parse_key(Doc),
+    ?assertMatch({ok, _}, R),
+    {ok, KD} = R,
+    ?assertMatch(#{public_key := #'RSAPublicKey'{}}, KD).
+
+parse_key_ec_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<KeyInfo xmlns='http://www.w3.org/2000/09/xmldsig#'>\n"
+        "<KeyName>some key</KeyName>\n"
+        "<KeyValue><ECKeyValue>\n"
+        "<PublicKey>\n"
+        "j5sLNXdJgD7ye531XlyUb2exL8I=\n"
+        "</PublicKey>\n"
+        "<NamedCurve URI='urn:oid:1.2.840.10045.3.1.7' />\n"
+        "</ECKeyValue></KeyValue>\n"
+        "</KeyInfo>\n">>),
+    R = parse_key(Doc),
+    ?assertMatch({ok, _}, R),
+    {ok, KD} = R,
+    ?assertMatch(#{name := <<"some key">>,
+                   public_key := {#'ECPoint'{}, {namedCurve, secp256r1}}}, KD).
+
+parse_key_cert_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<ds:KeyInfo xmlns:ds='http://www.w3.org/2000/09/xmldsig#'>"
+            "<ds:X509Data>"
+                "<ds:X509Certificate>MIIDfTCCAmWgAwIBAgIJANCSQXrTqpDjMA0GCSqGSIb3DQEBBQUAMFUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApRdWVlbnNsYW5kMREwDwYDVQQHDAhCcmlzYmFuZTEMMAoGA1UECgwDRm9vMRAwDgYDVQQDDAdzYW1saWRwMB4XDTEzMDQyOTA2MTAyOVoXDTIzMDQyOTA2MTAyOVowVTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClF1ZWVuc2xhbmQxETAPBgNVBAcMCEJyaXNiYW5lMQwwCgYDVQQKDANGb28xEDAOBgNVBAMMB3NhbWxpZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFhBuEO3fX+FlyT2YYzozxmXNXEmQjksigJSKD4hvsgsyGyl1iLkqNT6IbkuMXoyJG6vXufMNVLoktcLBd6eu6LQwwRjSU62AVCWZhIJP8U6lHqVsxiP90h7/b1zM7Hm9uM9RHtG+nKB7W0xNRihG8BUQOocSaLIMZZXqDPW1h/UvUqmpEzCtT0kJyXX0UAmDHzTYWHt8dqOYdcO2RAlJX0UKnwG1bHjTAfw01lJeOZiF66kH777nStYSElrHXr0NmCO/2gt6ouEnnUqJWDWRzaLbzhMLmGj83lmPgwZCBbIbnbQWLYPQ438EWfEYELq9nSQrgfUmmDPb4rtsQOXqZAgMBAAGjUDBOMB0GA1UdDgQWBBT64y2JSqY96YTYv1QbFyCPp3To/zAfBgNVHSMEGDAWgBT64y2JSqY96YTYv1QbFyCPp3To/zAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBQUAA4IBAQAecr+C4w3LYAU4pCbLAW2BbFWGZRqBAr6ZKZKQrrqSMUJUiRDoKc5FYJrkjl/sGHAe3b5vBrU3lb/hpSiKXVf4/zBP7uqAF75B6LwnMwYpPcXlnRyPngQcdTL5EyQT5vwqv+H3zB64TblMYbsvqm6+1ippRNq4IXQX+3NGTEkhh0xgH+e3wE8BjjiygDu0MqopaIVPemMVQIm3HI+4jmf60bz8GLD1J4dj5CvyW1jQCXu2K2fcS1xJS0FLrxh/QxR0+3prGkYiZeOWE/dHlTTvQLB+NftyamUthVxMFe8dvXMTix/egox+ps2NuO2XTkDaeeRFjUhPhS8SvZO9l0lZ</ds:X509Certificate>"
+            "</ds:X509Data>"
+        "</ds:KeyInfo>">>),
+    R = parse_key(Doc),
+    ?assertMatch({ok, _}, R),
+    {ok, KD} = R,
+    ?assertMatch(#{public_key := #'RSAPublicKey'{},
+                   certificate := #'OTPCertificate'{}}, KD),
+    {ok, Doc2} = generate_key(KD),
+    ?assertMatch({ok, KD}, parse_key(Doc2)).
 
 verify_valid_complicated_test() ->
     {ok, Doc} = xmlrat_parse:string(<<

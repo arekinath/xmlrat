@@ -41,15 +41,16 @@
 -export_type([options/0, algo/0, key_details/0, pubkey/0, cert/0]).
 
 -type options() :: map().
--type pubkey_algo() :: rsa | dsa | ecdsa | hmac.
--type hash_algo() :: sha1 | sha256 | sha384 | sha512.
+-type pubkey_algo() :: xmlrat_dsig:pubkey_algo().
+-type hash_algo() :: xmlrat_dsig:hash_algo().
 -type algo() :: {pubkey_algo(), hash_algo()}.
 -type key_details() :: #{name => binary()}.
--type pubkey() :: #'RSAPublicKey'{} |
-    {integer(), #'Dss-Parms'{}} |
-    {#'ECPoint'{}, {namedCurve, tuple() | atom()}}.
--type cert() :: #'OTPCertificate'{}.
 
+-type pubkey() :: xmlrat_dsig:pubkey().
+%% See {@link xmlrat_dsig:pubkey()}
+
+-type cert() :: xmlrat_dsig:cert().
+%% See {@link xmlrat_dsig:cert()}
 
 -callback retrieve_key(options(), key_details(), algo()) ->
     {ok, pubkey()} | {error, term()}.

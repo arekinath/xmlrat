@@ -42,18 +42,12 @@
 -type options() :: map().
 -type msg() :: binary().
 -type signature() :: binary().
--type pubkey_algo() :: rsa | dsa | ecdsa | hmac.
--type hash_algo() :: sha | sha256 | sha384 | sha512.
+-type pubkey_algo() :: xmlrat_dsig:pubkey_algo().
+-type hash_algo() :: xmlrat_dsig:hash_algo().
 -type algo() :: {pubkey_algo(), hash_algo()}.
--type pubkey() :: #'RSAPublicKey'{} |
-    {integer(), #'Dss-Parms'{}} |
-    {#'ECPoint'{}, {namedCurve, tuple() | atom()}}.
--type cert() :: #'OTPCertificate'{}.
--type key_details() :: #{
-    public_key => pubkey(),
-    certificate => cert(),
-    name => binary()
-    }.
+-type pubkey() :: xmlrat_dsig:pubkey().
+-type cert() :: xmlrat_dsig:cert().
+-type key_details() :: xmlrat_dsig:key_details().
 
 -callback algorithms(options()) -> {ok, [algo()]} | {error, term()}.
 %% Returns a list of algorithms supported by this signing instance.

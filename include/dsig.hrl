@@ -56,3 +56,5 @@
 
 -define(dsig_enveloped, <<"http://www.w3.org/2000/09/xmldsig#enveloped-signature">>).
 -define(dsig_xpath, <<"http://www.w3.org/TR/1999/REC-xpath-19991116">>).
+
+-define(NS_dsig, <<"http://www.w3.org/2000/09/xmldsig#">>).
