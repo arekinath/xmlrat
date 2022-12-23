@@ -328,6 +328,13 @@ scan(String, Var) ->
         ({var, _, 'InputVar'}) -> Var;
         (Other) -> Other
     end, T0).
+scan(String, InVar, TempVar) ->
+    {ok, T0, _} = erl_scan:string(lists:flatten(String)),
+    lists:map(fun
+        ({var, _, 'InputVar'}) -> InVar;
+        ({var, _, 'TempVar'}) -> TempVar;
+        (Other) -> Other
+    end, T0).
 
 last_axis(Axis, []) -> Axis;
 last_axis(_, [absolute | Rest]) ->
@@ -379,6 +386,32 @@ compile_step(S0, {child, {type_match, text}, []}) ->
     ?atoks(S2, [
         AxisVar, {'=', 1}, AxisToks, {',', 1},
         OutVar, {'=', 1}, StepToks]);
+compile_step(S0, {child, {type_match, name}, []}) ->
+    #?MODULE{ctx = InVar} = S0,
+    {TagsVar, S1} = tvar(S0, "Tags"),
+    {TagVar, S2} = tvar(S1, "Tag"),
+    {OutVar, S3} = cvar(S2, "Step"),
+    Toks = scan("[Tag || #xml_element{tag = Tag} <- InputVar]", InVar),
+    CaseToks = scan("case InputVar of [TempVar] -> TempVar; _ -> InputVar end",
+        TagsVar, TagVar),
+    ?atoks(S3, [
+        TagsVar, {'=', 1}, Toks, {',', 1},
+        OutVar, {'=', 1}, CaseToks]);
+compile_step(S0, {child, {type_match, 'local-name'}, []}) ->
+    #?MODULE{ctx = InVar} = S0,
+    {TagsVar, S1} = tvar(S0, "Tags"),
+    {TagVar, S2} = tvar(S1, "Tag"),
+    {OutVar, S3} = cvar(S2, "Step"),
+    Toks = scan("[case Tag of"
+        "{_, T, _} -> T;"
+        "{_, T} -> T;"
+        "T when is_binary(T) -> T end || "
+        "#xml_element{tag = Tag} <- InputVar]", InVar),
+    CaseToks = scan("case InputVar of [TempVar] -> TempVar; _ -> InputVar end",
+        TagsVar, TagVar),
+    ?atoks(S3, [
+        TagsVar, {'=', 1}, Toks, {',', 1},
+        OutVar, {'=', 1}, CaseToks]);
 compile_step(S0, {self, {name_match, '_'}, Predicates}) ->
     #?MODULE{ctx = InVar} = S0,
     {OutVar, S1} = cvar(S0, "Step"),
@@ -718,6 +751,32 @@ text_test() ->
     Root = {xml_element, <<"foo">>, [Attr], [<<"hi there">>]},
     Res = Fun([Root]),
     ?assertMatch(<<"hi there">>, Res).
+
+name_test() ->
+    XPath = xmlrat_xpath_parse:parse("/*[@bar = 'hi']/name()"),
+    {ok, Fun, _} = xmlrat_xpath_compile:compile_fun(XPath),
+    Attr = {xml_attribute, <<"bar">>, <<"hi">>},
+    Root = {xml_element, <<"foo">>, [Attr], [<<"hi there">>]},
+    Res = Fun([Root]),
+    ?assertMatch(<<"foo">>, Res).
+
+multi_name_test() ->
+    XPath = xmlrat_xpath_parse:parse("/foo/*/name()"),
+    {ok, Fun, _} = xmlrat_xpath_compile:compile_fun(XPath),
+    E0 = {xml_element, {<<"ns">>, <<"bar">>}, [], []},
+    E1 = {xml_element, <<"test">>, [], []},
+    E2 = {xml_element, <<"aaaa">>, [], []},
+    Root = {xml_element, <<"foo">>, [], [E0, E1, E2]},
+    Res = Fun([Root]),
+    ?assertMatch([{<<"ns">>, <<"bar">>}, <<"test">>, <<"aaaa">>], Res).
+
+local_name_test() ->
+    XPath = xmlrat_xpath_parse:parse("/*[@bar = 'hi']/local-name()"),
+    {ok, Fun, _} = xmlrat_xpath_compile:compile_fun(XPath),
+    Attr = {xml_attribute, <<"bar">>, <<"hi">>},
+    Root = {xml_element, {<<"ns">>, <<"foo">>}, [Attr], [<<"hi there">>]},
+    Res = Fun([Root]),
+    ?assertMatch(<<"foo">>, Res).
 
 child_compare_test() ->
     XPath = xmlrat_xpath_parse:parse("/foo[bar = 'hi']/baz/text()"),

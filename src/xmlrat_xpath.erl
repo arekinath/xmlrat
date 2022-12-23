@@ -57,6 +57,11 @@
 %%   <li><code>and</code>, <code>or</code> operators</li>
 %%   <li>equality operator</li>
 %%   <li><code>not()</code> function</li>
+%%   <li>pseudo-axis functions (only supported without arguments):<ul>
+%%       <li><code>text()</code></li>
+%%       <li><code>name()</code> (yields a {@link xmlrat:tag()})</li>
+%%       <li><code>local-name()</code></li>
+%%       </ul></li>
 %%   <li>other functions:<ul>
 %%       <li><code>last()</code></li>
 %%       <li><code>position()</code></li>

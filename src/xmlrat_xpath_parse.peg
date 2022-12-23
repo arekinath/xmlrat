@@ -164,7 +164,7 @@ pi <- "processing-instruction" s? "(" s? arg:literal s? ")" `
   Arg = proplists:get_value(arg, Node),
   {pi, Arg}
 `;
-nodetype <- "comment" / "text" / "processing-instruction" / "node" `binary_to_atom(iolist_to_binary(Node))`;
+nodetype <- "comment" / "text" / "processing-instruction" / "node" / "name" / "local-name" `binary_to_atom(iolist_to_binary(Node))`;
 nametest <- nametestany / nametestns / qname `{name_match, Node}`;
 nametestns <- ncname s? ":" s? "*" `[NS|_] = Node, {NS, '_'}`;
 nametestany <- "*" `'_'`;

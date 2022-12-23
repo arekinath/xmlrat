@@ -131,6 +131,23 @@
 %%   <li>any content or MXSL element</li>
 %% </ul>
 %%
+%% === &lt;mxsl:tag&gt; ===
+%%
+%% Generates an element with a dynamic tag name based on a record field.
+%%
+%% Attributes:
+%% <ul>
+%%  <li><code>mxsl:field</code>: specifies the record field whose contents will
+%%      be used to rename this tag.</li>
+%% </ul>
+%% Content:
+%% <ul>
+%%   <li>any content or MXSL element</li>
+%% </ul>
+%%
+%% The <code>mxsl:field</code> attribute will be elided from the output, but
+%% all other attributes of the tag will be inherited by the final output tag.
+%%
 %% == Entities ==
 %%
 %% Within any element content or attribute value, entities may be used to refer
@@ -159,14 +176,26 @@ to_expr(Doc, Subs) ->
     erl_syntax:list(ChildExprs).
 
 attrs_to_map(Attrs) ->
-    lists:foldl(fun
+    A0 = lists:foldl(fun
         (#xml_attribute{name = {_, Name, _}, value = V}, Acc) ->
             Acc#{Name => V};
         (#xml_attribute{name = Name, value = V}, Acc) ->
             Acc#{Name => V};
         (_, Acc) ->
             Acc
-    end, #{}, Attrs).
+    end, #{}, Attrs),
+    lists:foldl(fun
+        (#xml_attribute{name = {_, _, <<?mxsl, Name/binary>>}, value = V}, Acc) ->
+            Acc#{Name => V};
+        (_, Acc) ->
+            Acc
+    end, A0, Attrs).
+
+remove_mxsl_attrs(Attrs) ->
+    lists:filter(fun
+        (#xml_attribute{name = {_, _, <<?mxsl, _/binary>>}}) -> false;
+        (_) -> true
+    end, Attrs).
 
 string_bin(Bin) ->
     erl_syntax:binary([
@@ -440,6 +469,39 @@ compile([Next0 | Rest], Subs) ->
             end;
         #xml_element{tag = {_, _, <<?mxsl, "value-of">>}} ->
             error({bad_args, mxsl_value_of, must_be_empty});
+
+        #xml_element{tag = {_, _, <<?mxsl, "tag">>},
+                     attributes = Attrs0,
+                     content = Content0} ->
+            AttrMap = attrs_to_map(Attrs0),
+            case AttrMap of
+                #{<<"field">> := Field} ->
+                    case Subs of
+                        #{Field := Expr} ->
+                            Attrs1 = remove_mxsl_attrs(Attrs0),
+                            Attrs2 = compile(Attrs1, Subs),
+                            {DynAttrs, Content1} = compile_dyn_attributes(
+                                Content0, Subs),
+                            Content2 = erl_syntax:application(
+                                erl_syntax:atom(lists),
+                                erl_syntax:atom(flatten),
+                                [erl_syntax:list(compile(Content1, Subs))]),
+                            Attrs3 = Attrs2 ++ DynAttrs,
+                            [erl_syntax:record_expr(
+                                erl_syntax:atom(xml_element),
+                                [erl_syntax:record_field(erl_syntax:atom(tag),
+                                    Expr),
+                                 erl_syntax:record_field(erl_syntax:atom(attributes),
+                                    erl_syntax:list(Attrs3)),
+                                 erl_syntax:record_field(erl_syntax:atom(content),
+                                    Content2)
+                                ])];
+                        _ ->
+                            error({undefined_field, Field})
+                    end;
+                _ ->
+                    error({bad_args, mxsl_tag, AttrMap})
+            end;
 
         #xml_element{tag = {_, _, <<?mxsl, Name/binary>>}} ->
             error({unsupported_mxsl_tag, Name});

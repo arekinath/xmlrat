@@ -98,6 +98,19 @@
 -xml_record({gen_nstest, nstest,
     "<nstest xmlns='urn:root:' name='&name;'>&items;</nstest>"}).
 
+-record(intl_str, {
+    tag :: xmlrat:tag(),
+    lang :: binary(),
+    text :: binary()
+    }).
+-xpath_record({match_intl_str, intl_str, #{
+    tag => "/*/name()",
+    lang => "/*/@xml:lang",
+    text => "/*/text()"
+    }}).
+-xml_record({gen_intl_str, intl_str,
+    "<mxsl:tag mxsl:field='tag' xml:lang='&lang;'>&text;</mxsl:tag>"}).
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -175,5 +188,21 @@ gen_test() ->
     io:format("~s\n", [xmlrat_generate:string(Doc, #{indent => true})]),
     Rec = match_nstest(Doc),
     ?assertMatch(#nstest{name = <<"what">>, items = [Item1, Item2]}, Rec).
+
+intl_str_test() ->
+    {ok, Doc} = xmlrat_parse:string("<something xml:lang='en'>hello</something>"),
+    Rec = match_intl_str(Doc),
+    ?assertMatch(#intl_str{tag = <<"something">>, lang = <<"en">>,
+        text = <<"hello">>}, Rec),
+    Doc2 = gen_intl_str(Rec),
+    Rec2 = match_intl_str(Doc2),
+    ?assertMatch(Rec, Rec2),
+    {ok, Doc3} = xmlrat_parse:string("<foo:bar xmlns:foo='urn:foo:' xml:lang='jp'>what</foo:bar>"),
+    Rec3 = match_intl_str(Doc3),
+    ?assertMatch(#intl_str{tag = {<<"foo">>, <<"bar">>, _}, lang = <<"jp">>,
+        text = <<"what">>}, Rec3),
+    Doc4 = gen_intl_str(Rec3),
+    CDoc3 = xmlrat_c14n:string(Doc3),
+    ?assertMatch(CDoc3, xmlrat_c14n:string(Doc4)).
 
 -endif.

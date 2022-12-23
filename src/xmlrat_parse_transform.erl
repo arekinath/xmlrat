@@ -427,6 +427,8 @@ wrap_convert(Tree0, {type, _, boolean, []}, _D) ->
         erl_syntax:clause([erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string("false"))])], none, [erl_syntax:atom(false)]),
         erl_syntax:clause([erl_syntax:underscore()], none, [erl_syntax:atom(true)])
         ]);
+wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tag}, []]}, _D) ->
+    Tree0;
 wrap_convert(Tree0, {type, _, record, [{atom, _, Rec}]}, D) ->
     case D of
         #{Rec := DecoderFunc} -> ok;
@@ -537,6 +539,8 @@ wrap_econvert(Tree0, {type, _, atom, []}, _D) ->
         erl_syntax:atom(atom_to_binary),
         [Tree0]);
 wrap_econvert(Tree0, {type, _, boolean, []}, _D) ->
+    Tree0;
+wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tag}, []]}, _D) ->
     Tree0;
 wrap_econvert(Tree0, {type, _, record, [{atom, _, Rec}]}, E) ->
     case E of
