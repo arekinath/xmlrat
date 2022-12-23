@@ -429,6 +429,10 @@ wrap_convert(Tree0, {type, _, boolean, []}, _D) ->
         ]);
 wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tag}, []]}, _D) ->
     Tree0;
+wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,document}, []]}, _D) ->
+    Tree0;
+wrap_convert(Tree0, {type, _, xml_document, []}, _D) ->
+    Tree0;
 wrap_convert(Tree0, {type, _, record, [{atom, _, Rec}]}, D) ->
     case D of
         #{Rec := DecoderFunc} -> ok;
@@ -451,9 +455,15 @@ wrap_convert(Tree0, {type, L, union, Opts}, D) ->
         ({atom, _, undefined}) -> false;
         (_) -> true
     end, expand_subunions(Opts)),
-    Types = lists:usort(
-        [{T, A} || {type, _, T, A} <- WithoutUndef, is_list(A)]),
-    EnumValTypes = lists:usort([T || {T, _Loc, _V} <- WithoutUndef]),
+    Types = lists:usort(lists:foldl(fun
+        ({type, _, T, A}, Acc) when is_list(A) ->
+            [{T,A} | Acc];
+        ({remote_type, _, [{atom, _, xmlrat}, {atom, _, document}, []]}, Acc) ->
+            [{xml_document,[]} | Acc];
+        (_, Acc) -> Acc
+    end, [], WithoutUndef)),
+    EnumValTypes = lists:usort([T || {T, _Loc, _V} <- WithoutUndef,
+        not (T =:= remote_type)]),
     EnumErrClause = erl_syntax:clause(
         [erl_syntax:underscore()], none,
         [erl_syntax:application(
@@ -542,6 +552,10 @@ wrap_econvert(Tree0, {type, _, boolean, []}, _D) ->
     Tree0;
 wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tag}, []]}, _D) ->
     Tree0;
+wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,document}, []]}, _D) ->
+    Tree0;
+wrap_econvert(Tree0, {type, _, xml_document, []}, _D) ->
+    Tree0;
 wrap_econvert(Tree0, {type, _, record, [{atom, _, Rec}]}, E) ->
     case E of
         #{Rec := EncoderFunc} -> ok;
@@ -561,9 +575,15 @@ wrap_econvert(Tree0, {type, L, union, Opts}, D) ->
         ({atom, _, undefined}) -> false;
         (_) -> true
     end, expand_subunions(Opts)),
-    Types = lists:usort(
-        [{T, A} || {type, _, T, A} <- WithoutUndef, is_list(A)]),
-    EnumValTypes = lists:usort([T || {T, _Loc, _V} <- WithoutUndef]),
+    Types = lists:usort(lists:foldl(fun
+        ({type, _, T, A}, Acc) when is_list(A) ->
+            [{T,A} | Acc];
+        ({remote_type, _, [{atom, _, xmlrat}, {atom, _, document}, []]}, Acc) ->
+            [{xml_document,[]} | Acc];
+        (_, Acc) -> Acc
+    end, [], WithoutUndef)),
+    EnumValTypes = lists:usort([T || {T, _Loc, _V} <- WithoutUndef,
+        not (T =:= remote_type)]),
     case {Types, EnumValTypes} of
         {[_|_], []} ->
             Exprs = [wrap_econvert(Tree0, {type, L, Type, Args}, D)

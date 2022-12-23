@@ -111,6 +111,21 @@
 -xml_record({gen_intl_str, intl_str,
     "<mxsl:tag mxsl:field='tag' xml:lang='&lang;'>&text;</mxsl:tag>"}).
 
+-record(extensible, {
+    name :: binary(),
+    extension :: undefined | xmlrat:document()
+    }).
+-xpath_record({match_extensible, extensible, #{
+    name => "/Extensible/@Name",
+    extension => "/Extensible/Extension/*"
+    }}).
+-xml_record({gen_extensible, extensible,
+    "<Extensible Name='&name;'>"
+        "<mxsl:if defined='extension'>"
+            "<Extension>&extension;</Extension>"
+        "</mxsl:if>"
+    "</Extensible>"}).
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -204,5 +219,33 @@ intl_str_test() ->
     Doc4 = gen_intl_str(Rec3),
     CDoc3 = xmlrat_c14n:string(Doc3),
     ?assertMatch(CDoc3, xmlrat_c14n:string(Doc4)).
+
+ext_test() ->
+    {ok, Doc} = xmlrat_parse:string("<Extensible Name='testing'>"
+        "<Extension><Foobar>123</Foobar></Extension>"
+        "</Extensible>"),
+    Rec = match_extensible(Doc),
+    ?assertMatch(#extensible{name = <<"testing">>}, Rec),
+    #extensible{extension = ExtDoc} = Rec,
+    ?assertMatch([#xml_element{tag = <<"Foobar">>}], ExtDoc),
+    Rec2 = #extensible{name = <<"foo">>},
+    Doc2 = gen_extensible(Rec2),
+    {ok, Doc2M} = xmlrat_parse:string("<Extensible Name='foo' />"),
+    Doc2MC = xmlrat_c14n:string(Doc2M),
+    ?assertMatch(Doc2MC, xmlrat_c14n:string(Doc2)),
+    Rec3 = #extensible{name = <<"foo">>, extension = [
+        #xml_element{tag = <<"Elem0">>},
+        #xml_element{tag = <<"Elem1">>, attributes = [
+            #xml_attribute{name = <<"Attr">>, value = <<"val">>}]}]},
+    Doc3 = gen_extensible(Rec3),
+    {ok, Doc3M} = xmlrat_parse:string(
+        "<Extensible Name='foo'>"
+            "<Extension>"
+                "<Elem0 />"
+                "<Elem1 Attr='val' />"
+            "</Extension>"
+        "</Extensible>"),
+    Doc3MC = xmlrat_c14n:string(Doc3M),
+    ?assertMatch(Doc3MC, xmlrat_c14n:string(Doc3)).
 
 -endif.
