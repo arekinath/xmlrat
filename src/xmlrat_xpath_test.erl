@@ -107,9 +107,10 @@
     tag => "/*/name()",
     lang => "/*/@xml:lang",
     text => "/*/text()"
-    }}).
+    }, #{<<"ns">> => <<"/ns/">>}}).
 -xml_record({gen_intl_str, intl_str,
-    "<mxsl:tag mxsl:field='tag' xml:lang='&lang;'>&text;</mxsl:tag>"}).
+    "<mxsl:tag mxsl:field='tag' xml:lang='&lang;'>&text;</mxsl:tag>",
+    #{<<"ns">> => <<"/ns/">>}}).
 
 -record(extensible, {
     name :: binary(),
@@ -125,6 +126,20 @@
             "<Extension>&extension;</Extension>"
         "</mxsl:if>"
     "</Extensible>"}).
+
+-record(intl_thing, {
+    name :: [xmlrat:tagged_record(#intl_str{}, {ns, name})],
+    descr = [] :: [xmlrat:tagged_record(#intl_str{}, description)]
+    }).
+-xpath_record({match_intl_thing, intl_thing, #{
+    name => "/thing/ns:name",
+    descr => "/thing/description"
+    }, #{<<"ns">> => <<"/ns/">>}}).
+-xml_record({gen_intl_thing, intl_thing,
+    "<thing>"
+        "&name;"
+        "&descr;"
+    "</thing>", #{<<"ns">> => <<"/ns/">>}}).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -219,6 +234,18 @@ intl_str_test() ->
     Doc4 = gen_intl_str(Rec3),
     CDoc3 = xmlrat_c14n:string(Doc3),
     ?assertMatch(CDoc3, xmlrat_c14n:string(Doc4)).
+
+intl_thing_test() ->
+    {ok, Doc} = xmlrat_parse:string("<thing xmlns:ns='/ns/'><ns:name xml:lang='en'>hello</ns:name><ns:name xml:lang='de'>hallo</ns:name></thing>"),
+    Rec = match_intl_thing(Doc),
+    ?assertMatch(#intl_thing{name = [#intl_str{lang = <<"en">>, text = <<"hello">>},
+                                     #intl_str{lang = <<"de">>, text = <<"hallo">>}]}, Rec),
+    Rec2 = #intl_thing{name = [#intl_str{lang = <<"en">>, text = <<"hello">>}],
+                       descr = [#intl_str{text = <<"what is this">>}]},
+    Doc2 = gen_intl_thing(Rec2),
+    {ok, Doc3} = xmlrat_parse:string("<thing xmlns:ns='/ns/'><ns:name xml:lang='en'>hello</ns:name><description>what is this</description></thing>"),
+    CDoc3 = xmlrat_c14n:string(Doc3),
+    ?assertMatch(CDoc3, xmlrat_c14n:string(Doc2)).
 
 ext_test() ->
     {ok, Doc} = xmlrat_parse:string("<Extensible Name='testing'>"

@@ -233,12 +233,16 @@ transform({attribute, L, xpath_record, {FName, RecName, FieldMap, NS}}, S0) ->
         Acc#{Field => {FFName, Forms}}
     end, #{}, FieldMap),
     PackFields = maps:fold(fun (Field, {FFName, _Forms}, Acc) ->
-        #{Field := {Default, VType0}} = RF,
-        VType1 = expand_utypes(VType0, UT),
-        FieldForm = erl_syntax:record_field(
-            erl_syntax:atom(Field),
-            field_value_tree(Field, FFName, Default, VType1, D0)),
-        [FieldForm | Acc]
+        case RF of
+            #{Field := {Default, VType0}} ->
+                VType1 = expand_utypes(VType0, UT),
+                FieldForm = erl_syntax:record_field(
+                    erl_syntax:atom(Field),
+                    field_value_tree(Field, FFName, Default, VType1, D0)),
+                [FieldForm | Acc];
+            _ ->
+                error({bad_field, RecName, Field})
+        end
     end, [], FieldLookup),
     Body = [
         erl_syntax:record_expr(
@@ -256,6 +260,9 @@ transform({attribute, L, xpath_record, {FName, RecName, FieldMap, NS}}, S0) ->
     FuncForms = maps:fold(fun (_Field, {_FFName, Forms}, Acc) ->
         Acc ++ Forms
     end, [TopFuncForm1], FieldLookup),
+    %lists:foreach(fun (FForm) ->
+    %  io:format("~s\n", [erl_pp:form(FForm)])
+    %end, lists:reverse(FuncForms)),
     D1 = D0#{RecName => FName},
     S1 = S0#?MODULE{decoders = D1},
     {FuncForms, S1};
@@ -354,6 +361,9 @@ transform({attribute, L, xml_record, {FName, RecName, XmlTpl, NS}}, S0) ->
     WFuncForm1 = erl_parse:map_anno(fun (_) ->
         erl_anno:set_generated(true, L)
     end, WFuncForm0),
+    %lists:foreach(fun (FForm) ->
+    %  io:format("~s\n", [erl_pp:form(FForm)])
+    %end, [FuncForm1,WFuncForm1]),
 
     E1 = E0#{RecName => FName},
     S1 = S0#?MODULE{encoders = E1},
@@ -433,6 +443,23 @@ wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,document}, []]}, 
     Tree0;
 wrap_convert(Tree0, {type, _, xml_document, []}, _D) ->
     Tree0;
+wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tagged_record}, [RecType, TagType]]}, D) ->
+    TagTree = case TagType of
+        {atom, _, TagAtom} ->
+            TagStr = atom_to_list(TagAtom),
+            erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))]);
+        {type, _, tuple, [{atom,_,NSAtom},{atom,_,TagAtom}]} ->
+            NSStr = atom_to_list(NSAtom),
+            TagStr = atom_to_list(TagAtom),
+            erl_syntax:tuple([
+                erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(NSStr))]),
+                erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))])
+                ])
+    end,
+    {type, _, Record, [{atom, _, Rec}]} = RecType,
+    Tree1 = wrap_convert(Tree0, RecType, D),
+    erl_syntax:record_expr(Tree1, erl_syntax:atom(Rec),
+        [erl_syntax:record_field(erl_syntax:atom(tag), TagTree)]);
 wrap_convert(Tree0, {type, _, record, [{atom, _, Rec}]}, D) ->
     case D of
         #{Rec := DecoderFunc} -> ok;
@@ -513,6 +540,8 @@ field_value_tree(Field, FFName, Default, VType, D0) ->
                 [erl_syntax:tuple([
                     erl_syntax:atom(required_field),
                     erl_syntax:atom(Field)])]);
+        {{nil, _}, false} ->
+            erl_syntax:list([]);
         _ ->
             {ok, [Form]} = erl_parse:parse_exprs([Default, {dot, 0}]),
             Form
@@ -556,6 +585,23 @@ wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,document}, []]},
     Tree0;
 wrap_econvert(Tree0, {type, _, xml_document, []}, _D) ->
     Tree0;
+wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tagged_record}, [RecType, TagType]]}, D) ->
+    TagTree = case TagType of
+        {atom, _, TagAtom} ->
+            TagStr = atom_to_list(TagAtom),
+            erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))]);
+        {type, _, tuple, [{atom,_,NSAtom},{atom,_,TagAtom}]} ->
+            NSStr = atom_to_list(NSAtom),
+            TagStr = atom_to_list(TagAtom),
+            erl_syntax:tuple([
+                erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(NSStr))]),
+                erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))])
+                ])
+    end,
+    {type, _, Record, [{atom, _, Rec}]} = RecType,
+    Tree1 = erl_syntax:record_expr(Tree0, erl_syntax:atom(Rec),
+        [erl_syntax:record_field(erl_syntax:atom(tag), TagTree)]),
+    wrap_econvert(Tree1, RecType, D);
 wrap_econvert(Tree0, {type, _, record, [{atom, _, Rec}]}, E) ->
     case E of
         #{Rec := EncoderFunc} -> ok;

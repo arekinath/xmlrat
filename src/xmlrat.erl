@@ -37,8 +37,13 @@
 -export_type([
     xmlver/0, attrname/0, attrvalue/0, nsname/0, uri/0,
     pitarget/0, piopts/0, tag/0, attribute/0, namespace/0, content/0,
-    extid/0, pubid/0, component/0
+    extid/0, pubid/0, component/0, tagged_record/2
     ]).
+
+-type tagged_record(T, _Tag) :: T.
+%% A record type which contains a field named `tag', set to the given XML
+%% tag name. Enables the use of generic records for a set of XML tags with
+%% different names but the same underlying type.
 
 -type document() :: [component()].
 %% An XML document, consisting of components.
