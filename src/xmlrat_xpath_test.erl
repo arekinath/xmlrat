@@ -28,6 +28,7 @@
 -module(xmlrat_xpath_test).
 
 -compile({parse_transform, xmlrat_parse_transform}).
+-compile(nowarn_unused_function).
 
 -export([
     match_test/1, match_foobar/1, match_nstest_item/1,

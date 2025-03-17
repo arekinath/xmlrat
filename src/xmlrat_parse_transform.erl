@@ -456,7 +456,7 @@ wrap_convert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tagged_record}, [
                 erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))])
                 ])
     end,
-    {type, _, Record, [{atom, _, Rec}]} = RecType,
+    {type, _, _Record, [{atom, _, Rec}]} = RecType,
     Tree1 = wrap_convert(Tree0, RecType, D),
     erl_syntax:record_expr(Tree1, erl_syntax:atom(Rec),
         [erl_syntax:record_field(erl_syntax:atom(tag), TagTree)]);
@@ -598,7 +598,7 @@ wrap_econvert(Tree0, {remote_type, _, [{atom,_,xmlrat}, {atom,_,tagged_record}, 
                 erl_syntax:binary([erl_syntax:binary_field(erl_syntax:string(TagStr))])
                 ])
     end,
-    {type, _, Record, [{atom, _, Rec}]} = RecType,
+    {type, _, _Record, [{atom, _, Rec}]} = RecType,
     Tree1 = erl_syntax:record_expr(Tree0, erl_syntax:atom(Rec),
         [erl_syntax:record_field(erl_syntax:atom(tag), TagTree)]),
     wrap_econvert(Tree1, RecType, D);

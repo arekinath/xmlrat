@@ -45,8 +45,6 @@
 -type pubkey_algo() :: xmlrat_dsig:pubkey_algo().
 -type hash_algo() :: xmlrat_dsig:hash_algo().
 -type algo() :: {pubkey_algo(), hash_algo()}.
--type pubkey() :: xmlrat_dsig:pubkey().
--type cert() :: xmlrat_dsig:cert().
 -type key_details() :: xmlrat_dsig:key_details().
 
 -callback algorithms(options()) -> {ok, [algo()]} | {error, term()}.
