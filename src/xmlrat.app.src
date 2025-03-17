@@ -1,7 +1,7 @@
 {application, xmlrat,
  [
   {description, "Neotoma-based parser for XML 1.0"},
-  {vsn, "0.0.10"},
+  {vsn, "0.0.11"},
   {registered, []},
   {included_applications, [
   ]},

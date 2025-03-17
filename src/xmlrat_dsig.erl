@@ -269,7 +269,6 @@ verify(SignedDoc, SigDoc, Opts) ->
 referenced_subset([], _Refs) -> [];
 referenced_subset([E0 = #xml_element{} | Rest], Refs) ->
     MatchesRef = lists:any(fun (Ref) -> matches_ref(E0, Ref) end, Refs),
-    io:format("elem ~p matchesref = ~p\n", [E0, MatchesRef]),
     case MatchesRef of
         true ->
             [E0 | referenced_subset(Rest, Refs)];
