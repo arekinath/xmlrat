@@ -181,12 +181,14 @@ normalise_attrs_one(Other) -> Other.
 
 -type usedmap() :: #{nsname() => true}.
 -spec used_namespaces(usedmap(), xmlrat:component()) -> usedmap().
+used_namespaces(Used0, #xml_attribute{name = {default, _, _}}) ->
+    Used0;
+used_namespaces(Used0, #xml_attribute{name = {default, _}}) ->
+    Used0;
 used_namespaces(Used0, #xml_attribute{name = {NS, _, _}}) ->
     Used0#{NS => true};
 used_namespaces(Used0, #xml_attribute{name = {NS, _}}) ->
     Used0#{NS => true};
-used_namespaces(Used0, #xml_attribute{name = N}) when is_binary(N) ->
-    Used0#{default => true};
 used_namespaces(Used0, #xml_element{tag = {NS, _, _}, attributes = Attrs}) ->
     Used1 = Used0#{NS => true},
     lists:foldl(fun (Attr, Acc) ->
@@ -272,7 +274,8 @@ normalise_namespaces(F, NS0, NSA0, [Next0 | Rest]) ->
                     end
             end, Attrs1, NSAGen),
             NSA1 = maps:merge(NSA0, NSAGen),
-            Content1 = normalise_namespaces(F, NS1, NSA1, Content0),
+            F2 = maps:merge(maps:remove(default, F), NSALocal),
+            Content1 = normalise_namespaces(F2, NS1, NSA1, Content0),
             Next0#xml_element{attributes = Attrs2, content = Content1};
         _ ->
             Next0
@@ -500,6 +503,21 @@ default_ns_test() ->
                 "</Assertion>"
         "</saml2p:Response>">>,
         string(Doc2, #{comments => true})).
+
+default_ns_strip_test() ->
+    {ok, Doc} = xmlrat_parse:string(<<
+        "<foo:a xmlns:foo=\"urn:foo:\">"
+            "<foo:b xmlns=\"urn:bar:\" why='dunno'>"
+                "<foo:c attr='val'>hi</foo:c>"
+            "</foo:b>"
+        "</foo:a>">>),
+    ?assertMatch(<<
+        "<foo:a xmlns:foo=\"urn:foo:\">"
+            "<foo:b why=\"dunno\">"
+                "<foo:c attr=\"val\">hi</foo:c>"
+            "</foo:b>"
+        "</foo:a>">>,
+        string(Doc)).
 
 c14n_inclns_test() ->
     {ok, Doc} = xmlrat_parse:string(<<

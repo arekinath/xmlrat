@@ -69,9 +69,10 @@
     fingerprints => [fingerprint()],
     ca_certs => [#'OTPCertificate'{}],
     ca_cert_file => path(),
+    ignore_crl_fetch_errors => boolean(),
+    ignore_expired_certs => boolean(),
     danger_trust_any_key => boolean(),
-    danger_trust_any_cert => boolean(),
-    danger_ignore_crl_fetch_errors => boolean()
+    danger_trust_any_cert => boolean()
     }.
 
 -spec retrieve_key(options(),
@@ -228,10 +229,24 @@ validate_cert(M0 = #{ca_cert_file := Path}, Cert, Algo) ->
     M1 = maps:remove(ca_cert_file, M0),
     validate_cert(M1#{ca_certs => Entries1}, Cert, Algo);
 validate_cert(M = #{ca_certs := CAs}, Cert, _Algo) ->
-    IgnoreCRL = maps:get(danger_ignore_crl_fetch_errors, M, false),
+    IgnoreCRL = maps:get(ignore_crl_fetch_errors, M, false),
+    PathValOpts = case M of
+        #{ignore_expired_certs := true} ->
+            VF = fun
+                (_OtpCert, {bad_cert, cert_expired}, S) ->
+                    {valid, S};
+                (_OtpCert, {bad_cert, Why}, _S) ->
+                    {fail, Why};
+                (_OtpCert, _, S) ->
+                    {unknown, S}
+            end,
+            [{verify_fun, {VF, undefined}}];
+        _ ->
+            []
+    end,
     case find_ca(CAs, Cert) of
         {ok, CA} ->
-            case public_key:pkix_path_validation(CA, [Cert], []) of
+            case public_key:pkix_path_validation(CA, [Cert], PathValOpts) of
                 {ok, _} ->
                     case (catch fetch_dp_and_crls(Cert)) of
                         {'EXIT', _Reason} when IgnoreCRL ->

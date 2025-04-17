@@ -418,8 +418,15 @@ expand_namespaces(NS0, [Next0 | Rest]) ->
             {xml_attribute, Name1, Value};
         {xml_element, Name0, Attrs0, Content0} ->
             NS1 = gather_namespaces(NS0, Attrs0),
-            Name1 = expand_namespace_name(NS1, Name0),
-            Attrs1 = expand_namespaces(NS1, Attrs0),
+            Attrs1 = case expand_namespace_name(NS1, Name0) of
+                {ElemNS, _, _} = Name1 ->
+                    ElemNSURI = maps:get(ElemNS, NS1,
+                        maps:get(default, NS1, <<>>)),
+                    NS2 = NS1#{default => ElemNSURI},
+                    expand_namespaces(NS2, Attrs0);
+                Name1 ->
+                    expand_namespaces(NS1, Attrs0)
+            end,
             Content1 = expand_namespaces(NS1, Content0),
             {xml_element, Name1, Attrs1, Content1};
         _ ->

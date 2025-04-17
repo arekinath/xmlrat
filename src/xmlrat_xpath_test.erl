@@ -65,6 +65,16 @@
 
 -xpath({match_test, "/foo/bar/@id"}).
 
+-xpath({match_test_no_ns, "/a:foo/b:bar/@id", #{
+        <<"a">> => <<"urn:a:">>,
+        <<"b">> => <<"urn:b:">>
+    }}).
+-xpath({match_test_ns, "/a:foo/b:bar/@c:id", #{
+        <<"a">> => <<"urn:a:">>,
+        <<"b">> => <<"urn:b:">>,
+        <<"c">> => <<"urn:c:">>
+    }}).
+
 -xpath_record({match_foobar, foobar, #{
     a => "/foobar/attr[@name = 'a']/@value",
     b => "/foobar/attr[@name = 'b']/text()",
@@ -148,6 +158,12 @@
 basic_test() ->
     {ok, Doc} = xmlrat_parse:string("<foo><bar id='1'/></foo>"),
     ?assertMatch([#xml_attribute{value = <<"1">>}], match_test(Doc)).
+
+basic_ns_test() ->
+    {ok, Doc} = xmlrat_parse:string("<a:foo xmlns='urn:b:' xmlns:a='urn:a:' xmlns:c='urn:c:'><bar id='bar_id' c:id='c_id' /></a:foo>"),
+    ?assertMatch([#xml_attribute{value = <<"c_id">>}], match_test_ns(Doc)),
+    ?assertMatch([#xml_attribute{value = <<"bar_id">>},
+                  #xml_attribute{value = <<"c_id">>}], match_test_no_ns(Doc)).
 
 record_test() ->
     {ok, Doc} = xmlrat_parse:string("<foobar c='bar'>"
